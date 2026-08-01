@@ -38,6 +38,37 @@
   #hint { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); color: #aeb4c2; font-size: 13px; background: rgba(0,0,0,0.4); padding: 6px 14px; border-radius: 8px; pointer-events: none; }
   #version { position: fixed; bottom: 10px; right: 14px; color: #8b90a0; font-size: 12px; pointer-events: none; }
   #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #aeb4c2; font-size: 15px; background: #1a1d24; }
+
+  /* ---- 터치 컨트롤 (기본 숨김, 모바일/태블릿에서만 표시) ---- */
+  #touchUI { display: none; }
+  #touchUI.on { display: block; }
+  #joyBase {
+    position: fixed; left: 34px; bottom: 40px;
+    width: 130px; height: 130px; border-radius: 50%;
+    background: rgba(20,24,34,0.35);
+    border: 3px solid rgba(255,255,255,0.55);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+    touch-action: none; z-index: 20;
+  }
+  #joyStick {
+    position: absolute; left: 50%; top: 50%;
+    width: 60px; height: 60px; border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(230,235,245,0.75);
+    border: 2px solid rgba(255,255,255,0.8);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  #jumpBtn {
+    position: fixed; right: 40px; bottom: 52px;
+    width: 96px; height: 96px; border-radius: 50%;
+    background: rgba(26,60,42,0.55);
+    border: 3px solid rgba(255,255,255,0.55);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    color: #eafff0; font-size: 15px; font-weight: 700;
+    touch-action: none; z-index: 20; user-select: none;
+  }
+  #jumpBtn:active { background: rgba(40,90,62,0.75); transform: scale(0.94); }
   #lockIcon {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
     display: none; align-items: center; justify-content: center;
@@ -67,17 +98,27 @@
     </div>
   </div>
   <div id="stats"><span id="atkTxt">공격력 10</span><span id="goldTxt">골드 0</span></div>
-  <div id="hint">이동: WASD / 방향키 · 시점: 마우스 드래그 · 줌: 휠 · Shift: 시점 고정</div>
+  <div id="hint">이동: WASD / 방향키 · 시점: 마우스 드래그 · 줌: 휠 · Shift: 시점 고정 · Space: 점프</div>
   <div id="lockIcon"><div class="ring"></div></div>
   <div id="version">PROTO 3D 0.1</div>
   <div id="loading">3D 엔진 불러오는 중…</div>
 
+  <!-- 모바일/태블릿 전용 터치 컨트롤 (자동 표시) -->
+  <div id="touchUI">
+    <div id="joyBase"><div id="joyStick"></div></div>
+    <div id="jumpBtn"><span>점프</span></div>
+  </div>
+
 <script type="importmap">
-{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js" } }
+{ "imports": {
+  "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
 </script>
 
 <script type="module">
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /* =========================================================
    전역 상태 — 나중에 몹/스킬/아이템은 여기에 추가
@@ -86,14 +127,35 @@ const player = {
   hp: 100, maxHp: 100, exp: 0, maxExp: 100,
   level: 1, atk: 10, gold: 0,
   speed: 6, moving: false, animTime: 0,
+  // 점프 물리
+  y: 0, vy: 0, onGround: true,
+  jumpPower: 9, gravity: 26,
 };
 const keys = {};
+// 가상 조이스틱 입력 (-1~1). 터치로 갱신됨
+const joy = { x: 0, z: 0, active: false };
+let isTouch = false;
 
 // 카메라 궤도 파라미터
 const cam = { yaw: 0, pitch: 0.9, dist: 12, minDist: 6, maxDist: 22, shiftLock: false };
 
 let renderer, scene, camera, hero, clock;
 let heroParts = {};
+let mixer = null;              // 애니메이션 믹서 (모델에 애니 있을 때)
+let actions = {};              // 이름별 애니메이션 액션
+let currentAction = null;
+
+/* =========================================================
+   3D 모델 설정 — 여기만 바꾸면 캐릭터 교체됨
+   MODEL_URL 에 .glb 파일 경로/URL 을 넣으세요.
+   같은 폴더에 hero.glb 를 두면 './hero.glb' 로 지정.
+   비워두면('') 임시 캐릭터가 나옵니다.
+   ========================================================= */
+const MODEL_URL = '';         // 예: './hero.glb'  또는  'https://.../hero.glb'
+const MODEL_SCALE = 1.0;      // 모델 크기 보정
+const MODEL_Y = 0;            // 발이 바닥(y=0)에 오도록 보정
+// 애니메이션 클립 이름 매핑 (모델마다 다름 — 콘솔 로그 보고 맞추세요)
+const ANIM_NAMES = { idle: ['idle','Idle','Armature|idle','대기'], walk: ['walk','Walk','run','Run','걷기'] };
 
 init();
 
@@ -113,8 +175,7 @@ function init() {
 
   buildLights();
   buildGround();
-  hero = buildHero();
-  scene.add(hero);
+  loadHero();          // 모델 로드 시도 (실패/미지정 시 임시 캐릭터)
 
   clock = new THREE.Clock();
   bindInput(canvas);
@@ -123,6 +184,63 @@ function init() {
   document.getElementById('loading').style.display = 'none';
   updateHUD();
   renderer.setAnimationLoop(loop);
+}
+
+/* ---- 캐릭터 로드: 모델 URL 있으면 불러오고, 없으면 임시 캐릭터 ---- */
+function loadHero() {
+  // 이동/회전은 항상 이 컨테이너(hero)를 기준으로 동작
+  hero = new THREE.Group();
+  scene.add(hero);
+
+  if (!MODEL_URL) {
+    hero.add(buildPlaceholder());
+    return;
+  }
+
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('loading').textContent = '캐릭터 모델 불러오는 중…';
+
+  const loader = new GLTFLoader();
+  loader.load(
+    MODEL_URL,
+    (gltf) => {
+      const model = gltf.scene;
+      model.scale.setScalar(MODEL_SCALE);
+      model.position.y = MODEL_Y;
+      model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      hero.add(model);
+
+      // 애니메이션 준비
+      if (gltf.animations && gltf.animations.length) {
+        mixer = new THREE.AnimationMixer(model);
+        console.log('사용 가능한 애니메이션:', gltf.animations.map(a => a.name));
+        gltf.animations.forEach(clip => { actions[clip.name] = mixer.clipAction(clip); });
+        playAnim('idle');
+      }
+      // 이름표 다시 부착
+      attachLabel(hero);
+      document.getElementById('loading').style.display = 'none';
+    },
+    undefined,
+    (err) => {
+      console.warn('모델 로드 실패, 임시 캐릭터 사용:', err);
+      hero.add(buildPlaceholder());
+      document.getElementById('loading').style.display = 'none';
+    }
+  );
+}
+
+/* 클립 이름 후보 중 존재하는 것을 재생 */
+function playAnim(kind) {
+  if (!mixer) return;
+  const candidates = ANIM_NAMES[kind] || [];
+  let name = candidates.find(n => actions[n]);
+  if (!name) return;
+  const next = actions[name];
+  if (currentAction === next) return;
+  if (currentAction) currentAction.fadeOut(0.2);
+  next.reset().fadeIn(0.2).play();
+  currentAction = next;
 }
 
 /* ---- 조명 ---- */
@@ -157,75 +275,74 @@ function buildGround() {
   scene.add(group);
 }
 
-/* ---- 캐릭터: 블록형 (검은 후드 재킷, 검은 바지·신발, 흰 머리, 파란 눈) ---- */
-function buildHero() {
+/* ---- 임시 캐릭터: 원통·구를 섞어 각을 줄인 버전 (모델 없을 때 표시) ---- */
+function buildPlaceholder() {
   const g = new THREE.Group();
-  const box = (w, h, d, color) => new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color })
-  );
+  const mat = (color, opts={}) => new THREE.MeshStandardMaterial({ color, roughness: 0.7, ...opts });
+  const boxMesh = (w, h, d, color, r=0.08) => {
+    // 모서리를 살짝 깎은 박스 대신 얇은 세그먼트 박스로 부드러운 느낌
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+    return m;
+  };
+  const cyl = (rt, rb, h, color) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 16), mat(color));
+  const sph = (r, color) => new THREE.Mesh(new THREE.SphereGeometry(r, 20, 16), mat(color));
   const add = (mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.castShadow = true; g.add(mesh); return mesh; };
 
-  // 색상 팔레트
   const C = {
-    jacket: 0x1a1c26,   // 검은 후드 재킷
-    jacketShade: 0x141620,
-    pants: 0x171922,    // 검은 바지
-    pantsShade: 0x121319,
-    shoe: 0x0d0e13,     // 검은 신발
-    skin: 0xf0cbab,
-    skinShade: 0xe4b995,
-    hair: 0xe8ecf2,     // 흰~은색 머리
-    hairShade: 0xc9d2e0,
-    eye: 0x3f9fe0,      // 파란 눈
+    jacket: 0x1a1c26, jacketShade: 0x141620,
+    pants: 0x171922, pantsShade: 0x121319, shoe: 0x0d0e13,
+    skin: 0xf0cbab, hair: 0xe8ecf2, hairShade: 0xc9d2e0, eye: 0x3f9fe0,
   };
 
-  // 다리 (검은 바지)
-  heroParts.legL = add(box(0.5, 1.5, 0.5, C.pants), -0.32, 0.75, 0);
-  heroParts.legR = add(box(0.5, 1.5, 0.5, C.pantsShade), 0.32, 0.75, 0);
-  // 신발
-  add(box(0.56, 0.28, 0.75, C.shoe), -0.32, 0.14, 0.1);
-  add(box(0.56, 0.28, 0.75, C.shoe),  0.32, 0.14, 0.1);
+  // 다리 (원통 + 발끝 구)
+  heroParts.legL = add(cyl(0.22, 0.20, 1.5, C.pants), -0.3, 0.85, 0);
+  heroParts.legR = add(cyl(0.22, 0.20, 1.5, C.pantsShade), 0.3, 0.85, 0);
+  // 신발 (납작한 구 느낌)
+  const shoeL = add(sph(0.28, C.shoe), -0.3, 0.16, 0.12); shoeL.scale.set(1, 0.55, 1.4);
+  const shoeR = add(sph(0.28, C.shoe),  0.3, 0.16, 0.12); shoeR.scale.set(1, 0.55, 1.4);
 
-  // 몸통 (후드 재킷, 지퍼 라인)
-  add(box(1.35, 1.6, 0.72, C.jacket), 0, 2.2, 0);
-  add(box(0.06, 1.4, 0.05, C.jacketShade), 0, 2.2, 0.37); // 지퍼 중앙선
-  // 하이넥 칼라 (세워진 후드 깃)
-  add(box(1.1, 0.5, 0.7, C.jacket), 0, 3.15, 0);
-  add(box(0.9, 0.3, 0.5, 0x0e0f16), 0, 3.05, -0.12); // 후드 안쪽 그림자
+  // 골반/몸통 아래
+  add(cyl(0.4, 0.45, 0.5, C.jacket), 0, 1.75, 0);
+  // 몸통 (윗쪽이 넓은 원통 + 앞면 지퍼)
+  const torso = add(cyl(0.5, 0.45, 1.3, C.jacket), 0, 2.5, 0);
+  add(boxMesh(0.05, 1.2, 0.04, C.jacketShade), 0, 2.5, 0.46); // 지퍼선
+  // 어깨 구 (부드러운 연결)
+  add(sph(0.28, C.jacket), -0.55, 3.0, 0);
+  add(sph(0.28, C.jacketShade), 0.55, 3.0, 0);
+  // 하이넥 칼라
+  add(cyl(0.34, 0.42, 0.5, C.jacket), 0, 3.35, 0);
+  add(cyl(0.28, 0.3, 0.3, 0x0e0f16), 0, 3.45, -0.05);
 
-  // 팔 (손을 앞쪽/주머니 쪽으로)
-  heroParts.armL = add(box(0.42, 1.5, 0.42, C.jacket), -0.9, 2.15, 0.05);
-  heroParts.armR = add(box(0.42, 1.5, 0.42, C.jacketShade), 0.9, 2.15, 0.05);
+  // 팔 (원통 + 팔꿈치/손 구)
+  heroParts.armL = add(cyl(0.17, 0.15, 1.4, C.jacket), -0.72, 2.5, 0.02);
+  heroParts.armR = add(cyl(0.17, 0.15, 1.4, C.jacketShade), 0.72, 2.5, 0.02);
+  add(sph(0.16, C.skin), -0.72, 1.78, 0.05); // 손
+  add(sph(0.16, C.skin),  0.72, 1.78, 0.05);
 
   // 목
-  add(box(0.4, 0.25, 0.4, C.skin), 0, 3.28, 0);
+  add(cyl(0.16, 0.18, 0.3, C.skin), 0, 3.62, 0);
 
-  // 머리
-  add(box(1.1, 1.0, 1.0, C.skin), 0, 3.95, 0);
-  // 흰 머리카락 (삐죽한 느낌: 윗단 + 앞머리 뭉치)
-  add(box(1.18, 0.4, 1.08, C.hair), 0, 4.42, 0);
-  add(box(1.18, 0.55, 0.2, C.hair), 0, 4.05, -0.47);   // 뒷머리
-  add(box(0.3, 0.3, 0.15, C.hairShade), -0.35, 4.15, 0.5); // 앞머리 뭉치
-  add(box(0.3, 0.3, 0.15, C.hairShade),  0.1, 4.2, 0.5);
-  add(box(0.25, 0.25, 0.15, C.hairShade), 0.45, 4.1, 0.48);
-  // 파란 눈
-  add(box(0.22, 0.16, 0.05, C.eye), -0.26, 3.98, 0.52);
-  add(box(0.22, 0.16, 0.05, C.eye),  0.26, 3.98, 0.52);
-  // 눈썹/그림자 (강렬한 눈빛 느낌)
-  add(box(0.24, 0.05, 0.04, C.hairShade), -0.26, 4.12, 0.53);
-  add(box(0.24, 0.05, 0.04, C.hairShade),  0.26, 4.12, 0.53);
+  // 머리 (구 기반 — 각 없음)
+  const head = add(sph(0.55, C.skin), 0, 4.15, 0); head.scale.set(0.95, 1.05, 0.98);
+  // 머리카락 (구를 눌러 덮개처럼 + 앞머리 뭉치)
+  const hairTop = add(sph(0.6, C.hair), 0, 4.3, -0.02); hairTop.scale.set(1, 0.85, 1);
+  add(sph(0.2, C.hairShade), -0.34, 4.25, 0.42);
+  add(sph(0.22, C.hairShade), 0.02, 4.32, 0.46);
+  add(sph(0.18, C.hairShade), 0.36, 4.22, 0.42);
+  // 파란 눈 (작은 구)
+  const eyeL = add(sph(0.09, C.eye), -0.2, 4.12, 0.46); eyeL.scale.set(1, 1.2, 0.5);
+  const eyeR = add(sph(0.09, C.eye),  0.2, 4.12, 0.46); eyeR.scale.set(1, 1.2, 0.5);
 
-  g.position.set(0, 0, 0);
-  g.userData.facing = 0; // 바라보는 방향(rad)
+  attachLabel(g);
+  return g;
+}
 
-  // 이름표 (스프라이트)
+/* 이름표를 컨테이너에 부착 */
+function attachLabel(container) {
   const label = makeLabel('Lv.' + player.level + ' 주인공');
   label.position.set(0, 5.4, 0);
-  g.add(label);
+  container.add(label);
   heroParts.label = label;
-
-  return g;
 }
 
 function makeLabel(text) {
@@ -279,12 +396,80 @@ function bindInput(canvas) {
       cam.shiftLock = !cam.shiftLock;
       document.getElementById('lockIcon').style.display = cam.shiftLock ? 'flex' : 'none';
     }
+    // 스페이스바 점프 (PC)
+    if (e.code === 'Space' && !e.repeat) { e.preventDefault(); doJump(); }
   });
 
-  // 터치(태블릿/모바일 대비 기본 시점 회전)
-  canvas.addEventListener('touchstart', e => { const t = e.touches[0]; start(t.clientX, t.clientY); });
-  canvas.addEventListener('touchmove', e => { const t = e.touches[0]; move(t.clientX, t.clientY); e.preventDefault(); }, { passive: false });
+  // 터치(태블릿/모바일 시점 회전) — 조이스틱/버튼 위 터치는 그 요소가 처리하므로 여기선 캔버스 터치만
+  canvas.addEventListener('touchstart', e => { const t = e.changedTouches[0]; start(t.clientX, t.clientY); }, { passive: true });
+  canvas.addEventListener('touchmove', e => { const t = e.changedTouches[0]; move(t.clientX, t.clientY); }, { passive: true });
   canvas.addEventListener('touchend', end);
+
+  setupTouchControls();
+}
+
+/* ---- 터치 컨트롤: 기기 자동 감지 → 조이스틱 + 점프 버튼 ---- */
+function setupTouchControls() {
+  // 터치 지원 여부로 모바일/태블릿 자동 인식
+  isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  if (!isTouch) return;
+
+  document.getElementById('touchUI').classList.add('on');
+  // 힌트 문구를 터치용으로 교체
+  document.getElementById('hint').textContent = '왼쪽 원: 이동 · 오른쪽 버튼: 점프 · 화면 드래그: 시점';
+
+  const base = document.getElementById('joyBase');
+  const stick = document.getElementById('joyStick');
+  const jump = document.getElementById('jumpBtn');
+  const R = 45; // 조이스틱 최대 반경(px)
+  let joyId = null;
+
+  const setStick = (dx, dy) => {
+    const len = Math.hypot(dx, dy);
+    const cl = Math.min(len, R);
+    const ang = Math.atan2(dy, dx);
+    const sx = Math.cos(ang) * cl, sy = Math.sin(ang) * cl;
+    stick.style.transform = `translate(calc(-50% + ${sx}px), calc(-50% + ${sy}px))`;
+    // 입력값 정규화 (-1~1). 화면 위쪽(-y)이 앞(+z 입력)
+    joy.x = (dx / R); joy.z = (dy / R);
+    joy.x = Math.max(-1, Math.min(1, joy.x));
+    joy.z = Math.max(-1, Math.min(1, joy.z));
+    joy.active = true;
+  };
+  const resetStick = () => {
+    stick.style.transform = 'translate(-50%, -50%)';
+    joy.x = 0; joy.z = 0; joy.active = false; joyId = null;
+  };
+
+  base.addEventListener('touchstart', e => {
+    const t = e.changedTouches[0]; joyId = t.identifier;
+    const r = base.getBoundingClientRect();
+    setStick(t.clientX - (r.left + r.width/2), t.clientY - (r.top + r.height/2));
+    e.preventDefault();
+  }, { passive: false });
+  base.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== joyId) continue;
+      const r = base.getBoundingClientRect();
+      setStick(t.clientX - (r.left + r.width/2), t.clientY - (r.top + r.height/2));
+    }
+    e.preventDefault();
+  }, { passive: false });
+  base.addEventListener('touchend', e => {
+    for (const t of e.changedTouches) if (t.identifier === joyId) resetStick();
+    e.preventDefault();
+  }, { passive: false });
+  base.addEventListener('touchcancel', resetStick);
+
+  jump.addEventListener('touchstart', e => { doJump(); e.preventDefault(); }, { passive: false });
+}
+
+/* ---- 점프 실행 (PC 스페이스바 / 모바일 버튼 공용) ---- */
+function doJump() {
+  if (player.onGround) {
+    player.vy = player.jumpPower;
+    player.onGround = false;
+  }
 }
 
 /* =========================================================
@@ -293,19 +478,22 @@ function bindInput(canvas) {
 function loop() {
   const dt = Math.min(clock.getDelta(), 0.05);
   updatePlayer(dt);
+  if (mixer) mixer.update(dt);
   updateCamera();
   renderer.render(scene, camera);
 }
 
 function updatePlayer(dt) {
-  // 카메라 기준 이동 방향 계산
+  // 카메라 기준 이동 방향 계산 (키보드 + 조이스틱)
   let ix = 0, iz = 0;
   if (keys['w'] || keys['arrowup']) iz -= 1;
   if (keys['s'] || keys['arrowdown']) iz += 1;
   if (keys['a'] || keys['arrowleft']) ix -= 1;
   if (keys['d'] || keys['arrowright']) ix += 1;
+  // 조이스틱: 화면 위로 밀면 앞으로(iz-), 오른쪽이면 ix+
+  if (joy.active) { ix += joy.x; iz += joy.z; }
 
-  player.moving = (ix !== 0 || iz !== 0);
+  player.moving = (Math.abs(ix) > 0.001 || Math.abs(iz) > 0.001);
 
   // 시프트락: 캐릭터가 항상 카메라 정면을 바라봄 (이동 여부와 무관)
   if (cam.shiftLock) {
@@ -314,8 +502,9 @@ function updatePlayer(dt) {
     hero.rotation.y = cur + diff * Math.min(1, dt * 16);
   }
 
+  let bob = 0;
   if (player.moving) {
-    const len = Math.hypot(ix, iz); ix /= len; iz /= len;
+    let len = Math.hypot(ix, iz); if (len > 1) { ix /= len; iz /= len; }
     // 카메라 yaw 기준으로 이동 방향 회전
     const sin = Math.sin(cam.yaw), cos = Math.cos(cam.yaw);
     const wx = ix * cos - iz * sin;
@@ -332,18 +521,33 @@ function updatePlayer(dt) {
     }
 
     player.animTime += dt;
-    // 걷기: 팔다리 스윙
-    const sw = Math.sin(player.animTime * 10) * 0.5;
-    heroParts.legL.rotation.x = sw;
-    heroParts.legR.rotation.x = -sw;
-    heroParts.armL.rotation.x = -sw;
-    heroParts.armR.rotation.x = sw;
-    hero.position.y = Math.abs(Math.sin(player.animTime * 10)) * 0.12;
+    playAnim('walk');
+    // 임시 캐릭터일 때만 팔다리 스윙 (지면에 있을 때만 bob)
+    if (!mixer && heroParts.legL) {
+      const sw = Math.sin(player.animTime * 10) * 0.5;
+      heroParts.legL.rotation.x = sw;
+      heroParts.legR.rotation.x = -sw;
+      heroParts.armL.rotation.x = -sw;
+      heroParts.armR.rotation.x = sw;
+      if (player.onGround) bob = Math.abs(Math.sin(player.animTime * 10)) * 0.12;
+    }
   } else {
-    heroParts.legL.rotation.x = heroParts.legR.rotation.x = 0;
-    heroParts.armL.rotation.x = heroParts.armR.rotation.x = 0;
-    hero.position.y = 0;
+    playAnim('idle');
+    if (!mixer && heroParts.legL) {
+      heroParts.legL.rotation.x = heroParts.legR.rotation.x = 0;
+      heroParts.armL.rotation.x = heroParts.armR.rotation.x = 0;
+    }
   }
+
+  // 점프 물리 (중력 적용, 착지 판정)
+  player.vy -= player.gravity * dt;
+  player.y += player.vy * dt;
+  if (player.y <= 0) {
+    player.y = 0; player.vy = 0; player.onGround = true;
+  }
+
+  // 최종 높이 = 점프 높이 + 걷기 bob
+  hero.position.y = player.y + bob;
 }
 
 function updateCamera() {
