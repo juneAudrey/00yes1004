@@ -434,7 +434,7 @@ const UNIT_TYPES = {
     framesWalk: frameList('reze','run',6),
     framesAtk:  frameList('reze','attack',6),
     fpsWalk: 10, fpsAtk: 11,
-    faceLeft: true,
+    faceLeft: false,   // 레제 원본은 오른쪽을 보고 있음
     drawScale: 2.7,
   },
 
@@ -459,8 +459,10 @@ const UNIT_TYPES = {
 // ── 타워(각 진영 시그니처 건물) 정의 ──
 // 플레이어 = 오른쪽(애니메이션 진영), CPU = 왼쪽(유튜버 진영)
 const TOWERS = {
-  player: { name: '애니 본진', emoji: '🏯', x: GAME_W-90, maxHp: 1500, color:'#e74c3c', label:'PLAYER' },
-  enemy:  { name: '유튜브 스튜디오', emoji: '📺', x: 90,   maxHp: 1500, color:'#2c3e50', label:'CPU' },
+  player: { name: '애니 본진', emoji: '🏯', x: GAME_W-90, maxHp: 1500, color:'#e74c3c', label:'PLAYER',
+            img:'assets/towers/anime_tower.png' },
+  enemy:  { name: '유튜브 스튜디오', emoji: '📺', x: 90,   maxHp: 1500, color:'#2c3e50', label:'CPU',
+            img:'assets/towers/youtube_tower.png' },
 };
 
 // ── 게임 상태 ──
@@ -473,6 +475,8 @@ function initState() {
     projectiles: [],         // 원거리 발사체
     explosions: [],          // 폭발 이펙트(레제 폭탄)
     towerHp: { player: TOWERS.player.maxHp, enemy: TOWERS.enemy.maxHp },
+    towerShake: { player: 0, enemy: 0 },        // 피격 흔들림 타이머
+    towerPrevHp: { player: TOWERS.player.maxHp, enemy: TOWERS.enemy.maxHp },
     cooldowns: { melee:0, ranged:0, tank:0 },
     enemyTimer: 0,           // 적 AI 스폰 타이머
     over: false, last: performance.now(),
@@ -611,6 +615,13 @@ function update(dt) {
   for (const ex of state.explosions){ ex.t += dt; ex.r = ex.max * Math.min(1, ex.t/0.25); }
   state.explosions = state.explosions.filter(ex => ex.t < 0.4);
 
+  // 타워 피격 감지 → 흔들림 트리거, 흔들림 타이머 감소
+  for (const s of ['player','enemy']){
+    if (state.towerHp[s] < state.towerPrevHp[s]) state.towerShake[s] = 0.32;  // 맞으면 흔들
+    state.towerPrevHp[s] = state.towerHp[s];
+    if (state.towerShake[s] > 0) state.towerShake[s] = Math.max(0, state.towerShake[s]-dt);
+  }
+
   // 죽은 것 정리
   state.units = state.units.filter(u => u.hp > 0);
   state.projectiles = state.projectiles.filter(p => !p.dead);
@@ -670,39 +681,26 @@ function draw() {
   // 게임 좌표계로 변환 (DPR 포함): 화면px = (게임좌표 × scale + off) × dpr
   ctx.setTransform(scale*dpr, 0, 0, scale*dpr, offX*dpr, offY*dpr);
 
-  // 배경: 좌(유튜버·빨강) → 우(애니·보라) 은은한 진영 그라데이션
-  const bg = ctx.createLinearGradient(0,0,GAME_W,0);
-  bg.addColorStop(0.00, '#fdeaea');   // 왼쪽 옅은 빨강
-  bg.addColorStop(0.40, '#fbf3f4');
-  bg.addColorStop(0.50, '#f7f4fb');
-  bg.addColorStop(0.60, '#f6f1fb');
-  bg.addColorStop(1.00, '#efe6fb');   // 오른쪽 옅은 보라
-  ctx.fillStyle = bg;
-  ctx.fillRect(0,0,GAME_W,GAME_H);
-
-  // 하늘빛 상단 광 (양 진영 색)
-  const glowL = ctx.createRadialGradient(GAME_W*0.12,120,0, GAME_W*0.12,120, 420);
-  glowL.addColorStop(0,'rgba(229,57,53,.10)'); glowL.addColorStop(1,'transparent');
-  ctx.fillStyle=glowL; ctx.fillRect(0,0,GAME_W,GAME_H);
-  const glowR = ctx.createRadialGradient(GAME_W*0.88,120,0, GAME_W*0.88,120, 420);
-  glowR.addColorStop(0,'rgba(142,68,215,.12)'); glowR.addColorStop(1,'transparent');
-  ctx.fillStyle=glowR; ctx.fillRect(0,0,GAME_W,GAME_H);
-
-  // 바닥: 진영별로 살짝 다른 색 띠
+  // 배경 이미지 (왼쪽 붉은 황무지=유튜버 / 오른쪽 푸른 초원=애니)
   const groundY = GROUND_Y+40;
-  const gg = ctx.createLinearGradient(0,0,GAME_W,0);
-  gg.addColorStop(0,'#f3d9d9'); gg.addColorStop(0.5,'#ede8f0'); gg.addColorStop(1,'#e2d3f2');
-  ctx.fillStyle = gg;
-  ctx.fillRect(0, groundY, GAME_W, GAME_H-groundY);
-
-  // 중앙 대치선 (연한 세로 광)
-  ctx.fillStyle = 'rgba(120,120,140,.06)';
-  ctx.fillRect(GAME_W/2-2, 0, 4, groundY);
-
-  // 바닥선
-  ctx.strokeStyle = 'rgba(0,0,0,.12)';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0,groundY); ctx.lineTo(GAME_W,groundY); ctx.stroke();
+  const bgImg = getImg('assets/bg/battlefield.png');
+  if (bgImg && bgImg.complete && bgImg.naturalWidth) {
+    ctx.drawImage(bgImg, 0, 0, GAME_W, GAME_H);
+    // 캐릭터/타워 가독성 보강: 하단(지면)에 아주 옅은 밝기 오버레이
+    const veil = ctx.createLinearGradient(0, groundY-60, 0, GAME_H);
+    veil.addColorStop(0, 'rgba(255,255,255,0)');
+    veil.addColorStop(1, 'rgba(255,255,255,0.12)');
+    ctx.fillStyle = veil;
+    ctx.fillRect(0, groundY-60, GAME_W, GAME_H-(groundY-60));
+  } else {
+    // ── 폴백: 로드 전 진영 그라데이션 ──
+    const bg = ctx.createLinearGradient(0,0,GAME_W,0);
+    bg.addColorStop(0.00,'#fdeaea'); bg.addColorStop(0.50,'#f7f4fb'); bg.addColorStop(1.00,'#efe6fb');
+    ctx.fillStyle = bg; ctx.fillRect(0,0,GAME_W,GAME_H);
+    const gg = ctx.createLinearGradient(0,0,GAME_W,0);
+    gg.addColorStop(0,'#f3d9d9'); gg.addColorStop(0.5,'#ede8f0'); gg.addColorStop(1,'#e2d3f2');
+    ctx.fillStyle = gg; ctx.fillRect(0, groundY, GAME_W, GAME_H-groundY);
+  }
 
   // 타워 그리기
   drawTower('player');
@@ -751,37 +749,76 @@ function draw() {
 function drawTower(side) {
   const T = TOWERS[side];
   const hp = state.towerHp[side], ratio = hp / T.maxHp;
-  const w = 180, h = 440;
-  const x = T.x - w/2, y = GROUND_Y + 40 - h;
+  const tsec = performance.now()/1000;
 
-  // 건물 본체 (이모지로 대체 — 나중에 이미지 교체 가능)
-  ctx.font = '300px serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  ctx.fillText(T.emoji, T.x, GROUND_Y + 40);
+  // ── 움직임 계산 ──
+  // 1) 호흡하듯 상하 부유 (진영마다 위상 다르게)
+  const phase = side==='player' ? 0.9 : 0;
+  const floatY = Math.sin(tsec*1.6 + phase) * 5;         // ±5px 상하
+  // 2) 아주 미세한 좌우 흔들림
+  const swayX = Math.sin(tsec*1.1 + phase) * 2;          // ±2px
+  // 3) 피격 흔들림 (맞으면 부르르)
+  const sh = state.towerShake[side] || 0;
+  const shakeX = sh>0 ? Math.sin(tsec*60) * sh * 22 : 0;
+  const shakeY = sh>0 ? Math.cos(tsec*55) * sh * 10 : 0;
 
-  // 이름
-  ctx.fillStyle = '#333'; ctx.font = 'bold 22px sans-serif';
-  ctx.fillText(T.name, T.x, y - 30);
+  // 타워 바닥이 지면(GROUND_Y+40)에 닿도록 이미지 배치
+  const baseY = GROUND_Y + 40;
+  const img = getImg(T.img);
+  let topY;   // 타워 상단 y (이름/체력바 배치용)
 
-  // 진영 라벨 배지 (PLAYER / CPU) — 잘 인식되도록
+  if (img && img.complete && img.naturalWidth) {
+    // 이미지 크기: 높이를 약 440px로 맞추고 비율 유지
+    const H = 470;
+    const W = H * (img.naturalWidth / img.naturalHeight);
+    const drawX = T.x - W/2 + swayX + shakeX;
+    const drawY = baseY - H + floatY + shakeY;
+    topY = drawY;
+    // 부드러운 그림자
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.14)';
+    ctx.beginPath();
+    ctx.ellipse(T.x, baseY-6, W*0.34, 14, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    ctx.drawImage(img, drawX, drawY, W, H);
+  } else {
+    // ── 폴백: 이모지 ──
+    ctx.font = '300px serif';
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillText(T.emoji, T.x + swayX + shakeX, baseY + floatY + shakeY);
+    topY = baseY - 440;
+  }
+
+  ctx.textAlign = 'center';
+
+  // 이름 (배경 위에서도 잘 보이게 외곽선 처리)
+  ctx.font = 'bold 22px sans-serif';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.lineWidth = 5;
+  ctx.strokeText(T.name, T.x, topY - 30);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(T.name, T.x, topY - 30);
+
+  // 진영 라벨 배지
   const isPlayer = side === 'player';
-  const badge = T.label;                       // 'PLAYER' | 'CPU'
+  const badge = T.label;
   ctx.font = 'bold 16px sans-serif';
   const padX = 12, bwd = ctx.measureText(badge).width + padX*2;
-  const bxd = T.x - bwd/2, byd = y - 78, bhd = 26;
+  const bxd = T.x - bwd/2, byd = topY - 78, bhd = 26;
   ctx.fillStyle = isPlayer ? '#2e7d32' : '#c62828';
   roundRect(bxd, byd, bwd, bhd, 13); ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle';
   ctx.fillText(badge, T.x, byd + bhd/2 + 1);
   ctx.textBaseline = 'alphabetic';
 
   // 체력바
-  const bw = 160, bh = 14, bx = T.x - bw/2, by = y - 22;
+  const bw = 160, bh = 14, bx = T.x - bw/2, by = topY - 22;
+  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(bx-2,by-2,bw+4,bh+4);  // 어두운 테두리 배경
   ctx.fillStyle = '#ddd'; ctx.fillRect(bx,by,bw,bh);
   ctx.fillStyle = ratio>.3 ? '#2ecc71' : '#e74c3c';
   ctx.fillRect(bx,by,bw*ratio,bh);
-  ctx.strokeStyle='#999'; ctx.lineWidth=1; ctx.strokeRect(bx,by,bw,bh);
+  ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=1.5; ctx.strokeRect(bx,by,bw,bh);
 }
 
 /* ── 병사 하나 그리기 ──
@@ -794,12 +831,14 @@ function getImg(src){
   if(!imgCache[src]){ const i=new Image(); i.src=src; imgCache[src]=i; }
   return imgCache[src];
 }
-// 모든 캐릭터 프레임 미리 로딩 (원 깜빡임 방지)
+// 모든 캐릭터 프레임 + 타워 이미지 미리 로딩
 function preloadUnitFrames(){
   for (const key in UNIT_TYPES){
     const t = UNIT_TYPES[key];
     [...(t.framesWalk||[]), ...(t.framesAtk||[])].forEach(getImg);
   }
+  for (const s in TOWERS){ if (TOWERS[s].img) getImg(TOWERS[s].img); }
+  getImg('assets/bg/battlefield.png');   // 전장 배경
 }
 // frames 배열에서 "지금 준비된" 이미지를 고른다.
 // 원하는 프레임이 아직 안 왔으면, 이미 로드된 다른 프레임으로 대체 → 도형/빈칸 안 뜸
