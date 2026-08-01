@@ -87,6 +87,78 @@
     background: rgba(20,20,26,.85); color:#fff; font-weight:700; font-size:14px;
     padding: 6px 14px; border-radius: 20px;
   }
+  /* ===== 오프닝 화면 ===== */
+  #opening {
+    position: absolute; inset: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(120% 90% at 15% 50%, rgba(198,40,40,.55), transparent 55%),
+      radial-gradient(120% 90% at 85% 50%, rgba(0,150,136,.55), transparent 55%),
+      #14141a;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  #opening::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(105deg,
+      transparent 0 48%, rgba(255,255,255,.10) 49% 51%, transparent 52% 100%);
+    pointer-events: none;
+  }
+  .op-inner {
+    position: relative; text-align: center; color: #fff;
+    padding: 20px; width: 100%; max-width: 1000px;
+    animation: opIn .6s ease both;
+  }
+  @keyframes opIn { from{opacity:0; transform:translateY(18px);} to{opacity:1;transform:none;} }
+  .op-vs-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: clamp(20px, 6vw, 80px); margin-bottom: 26px;
+  }
+  .op-side { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .op-face {
+    font-size: clamp(56px, 11vw, 104px); line-height: 1;
+    filter: drop-shadow(0 6px 14px rgba(0,0,0,.5));
+    animation: bob 2.2s ease-in-out infinite;
+  }
+  .op-side.player .op-face { animation-delay: .4s; }
+  @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+  .op-team { font-size: clamp(15px,2.4vw,22px); font-weight: 800; }
+  .op-role {
+    font-size: 12px; font-weight: 700; letter-spacing: .05em;
+    padding: 3px 10px; border-radius: 20px;
+  }
+  .op-side.cpu .op-role    { background:#c62828; }
+  .op-side.player .op-role { background:#00897b; }
+  .op-vs {
+    font-size: clamp(34px, 7vw, 64px); font-weight: 900; font-style: italic;
+    color: #ffd54a; text-shadow: 0 3px 0 #a67c00, 0 0 24px rgba(255,213,74,.5);
+    transform: rotate(-6deg);
+  }
+  .op-title {
+    font-size: clamp(34px, 8vw, 78px); font-weight: 900; line-height: 1.05;
+    letter-spacing: -.01em;
+    text-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 30px rgba(0,0,0,.4);
+    margin-bottom: 8px;
+  }
+  .op-title .op-title-sub {
+    display: block; font-size: clamp(14px, 2.6vw, 22px); font-weight: 800;
+    color: #ffd54a; letter-spacing: .18em; margin-bottom: 6px; text-shadow: none;
+  }
+  .op-title em {
+    font-style: normal;
+    background: linear-gradient(90deg,#ff5252,#ffd54a,#4dd0e1);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .op-start {
+    margin-top: 28px; font-size: clamp(15px,2.6vw,20px); font-weight: 700;
+    animation: blink 1.2s steps(2,start) infinite;
+  }
+  @keyframes blink { 50% { opacity: .25; } }
+  .op-hint { margin-top: 12px; font-size: 13px; color: #c9c9d4; font-weight: 600; }
+  @media (prefers-reduced-motion: reduce){
+    .op-inner,.op-face,.op-start{animation:none!important}
+  }
+
   /* 결과 오버레이 */
   #overlay {
     position: absolute; inset: 0;
@@ -115,10 +187,37 @@
     <div class="money">💰 <span id="money-val">0</span>
       <div class="bar"><span id="money-bar"></span></div>
     </div>
-    <div id="stage-name">🇰🇷 한국 남산타워 &nbsp;VS&nbsp; 프랑스 에펠탑 🇫🇷</div>
+    <div id="stage-name">📺 CPU 유튜버 &nbsp;VS&nbsp; 애니 캐릭터 PLAYER 🏯</div>
   </div>
 
   <div id="ui"><!-- 병사 버튼 JS로 생성 --></div>
+
+  <!-- ===== 오프닝 화면 ===== -->
+  <div id="opening">
+    <div class="op-inner">
+      <div class="op-vs-row">
+        <div class="op-side cpu">
+          <div class="op-face">📺</div>
+          <div class="op-team">유튜버 군단</div>
+          <div class="op-role">CPU · 왼쪽</div>
+        </div>
+        <div class="op-vs">VS</div>
+        <div class="op-side player">
+          <div class="op-face">🐷</div>
+          <div class="op-team">애니 캐릭터</div>
+          <div class="op-role">PLAYER · 오른쪽</div>
+        </div>
+      </div>
+
+      <h1 class="op-title">
+        <span class="op-title-sub">유튜버 vs 애니메이션</span>
+        채운이의 <em>대전쟁</em>
+      </h1>
+
+      <div class="op-start">아무 키를 누르거나 화면을 터치하세요</div>
+      <div class="op-hint">◀ CPU (왼쪽) &nbsp;&nbsp;|&nbsp;&nbsp; 당신은 오른쪽 진영입니다 (PLAYER) ▶</div>
+    </div>
+  </div>
 
   <div id="overlay">
     <div class="card">
@@ -233,10 +332,11 @@ const UNIT_TYPES = {
   },
 };
 
-// ── 타워(각 국가 시그니처 건물) 정의 ──
+// ── 타워(각 진영 시그니처 건물) 정의 ──
+// 플레이어 = 오른쪽(애니메이션 진영), CPU = 왼쪽(유튜버 진영)
 const TOWERS = {
-  player: { name: '남산타워',  emoji: '🗼', x: 90,        maxHp: 1500, color:'#e74c3c' },
-  enemy:  { name: '에펠탑',    emoji: '🏛️', x: GAME_W-90,  maxHp: 1500, color:'#2c3e50' },
+  player: { name: '애니 본진', emoji: '🏯', x: GAME_W-90, maxHp: 1500, color:'#e74c3c', label:'PLAYER' },
+  enemy:  { name: '유튜브 스튜디오', emoji: '📺', x: 90,   maxHp: 1500, color:'#2c3e50', label:'CPU' },
 };
 
 // ── 게임 상태 ──
@@ -257,7 +357,7 @@ function initState() {
 /* ── 병사 스폰 ── side: 'player' | 'enemy' ── */
 function spawnUnit(typeKey, side) {
   const t = UNIT_TYPES[typeKey];
-  const fromX = side === 'player' ? TOWERS.player.x + 40 : TOWERS.enemy.x - 40;
+  const fromX = side === 'player' ? TOWERS.player.x - 40 : TOWERS.enemy.x + 40;
   state.units.push({
     type: typeKey, side,
     x: fromX, y: GROUND_Y,
@@ -282,6 +382,7 @@ function tryProduce(typeKey) {
    업데이트 (물리/전투 로직)
    ========================================================================= */
 function update(dt) {
+  if (!started) return;   // 오프닝 화면 동안은 정지
   if (state.over) return;
 
   // 돈 회복
@@ -303,7 +404,7 @@ function update(dt) {
   for (const u of state.units) {
     if (u.hp <= 0) continue;
     const t = UNIT_TYPES[u.type];
-    const dir = u.side === 'player' ? 1 : -1;
+    const dir = u.side === 'player' ? -1 : 1;
 
     // 사거리 내 가장 가까운 적 탐색
     const target = findTarget(u, t);
@@ -360,7 +461,7 @@ function update(dt) {
 
 /* 사거리 내 타겟 찾기 (적 유닛 또는 적 타워). ref는 유닛객체 또는 'tower:side' */
 function findTarget(u, t) {
-  const dir = u.side === 'player' ? 1 : -1;
+  const dir = u.side === 'player' ? -1 : 1;
   const enemySide = u.side === 'player' ? 'enemy' : 'player';
   let best = null, bestDist = Infinity;
 
@@ -445,6 +546,19 @@ function drawTower(side) {
   ctx.fillStyle = '#333'; ctx.font = 'bold 22px sans-serif';
   ctx.fillText(T.name, T.x, y - 30);
 
+  // 진영 라벨 배지 (PLAYER / CPU) — 잘 인식되도록
+  const isPlayer = side === 'player';
+  const badge = T.label;                       // 'PLAYER' | 'CPU'
+  ctx.font = 'bold 16px sans-serif';
+  const padX = 12, bwd = ctx.measureText(badge).width + padX*2;
+  const bxd = T.x - bwd/2, byd = y - 78, bhd = 26;
+  ctx.fillStyle = isPlayer ? '#2e7d32' : '#c62828';
+  roundRect(bxd, byd, bwd, bhd, 13); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(badge, T.x, byd + bhd/2 + 1);
+  ctx.textBaseline = 'alphabetic';
+
   // 체력바
   const bw = 160, bh = 14, bx = T.x - bw/2, by = y - 22;
   ctx.fillStyle = '#ddd'; ctx.fillRect(bx,by,bw,bh);
@@ -465,7 +579,7 @@ function getImg(src){
 }
 function drawUnit(u) {
   const t = UNIT_TYPES[u.type];
-  const dir = u.side==='player' ? 1 : -1;
+  const dir = u.side==='player' ? -1 : 1;
 
   // 프레임 시퀀스(PNG)가 있으면 그걸 애니메이션, 없으면 도형
   const frames = u.state==='attack'
@@ -519,6 +633,17 @@ function drawUnit(u) {
   ctx.fillStyle='rgba(0,0,0,.15)'; ctx.fillRect(bx,by,bw,bh);
   ctx.fillStyle = u.side==='player' ? '#3498db' : '#e74c3c';
   ctx.fillRect(bx,by,bw*r,bh);
+}
+
+// 둥근 사각형 경로 (배지/버튼용)
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
 }
 
 // 색상 밝기 조절 유틸
@@ -584,13 +709,31 @@ function endGame(win){
   document.getElementById('overlay-title').textContent = win ? '승리! 🎉' : '패배…';
   document.getElementById('overlay-title').style.color = win ? '#2ecc71':'#e74c3c';
   document.getElementById('overlay-sub').textContent =
-    win ? '에펠탑을 무너뜨렸습니다!' : '남산타워가 파괴되었습니다.';
+    win ? '유튜브 스튜디오를 함락했습니다!' : '애니 본진이 파괴되었습니다.';
   document.getElementById('overlay').style.display='flex';
 }
 function restart(){
   document.getElementById('overlay').style.display='none';
   initState();
 }
+
+// ── 오프닝 → 게임 시작 ──
+let started = false;
+function startGame(){
+  if (started) return;
+  started = true;
+  const op = document.getElementById('opening');
+  op.style.transition = 'opacity .35s';
+  op.style.opacity = '0';
+  setTimeout(()=>{ op.style.display='none'; }, 360);
+  initState();                      // 상태 초기화(오프닝 동안 안 흐르게)
+  state.last = performance.now();
+  // playSfx('start');  // 사운드 넣으면 사용
+}
+// 아무 키 / 클릭 / 터치로 시작
+window.addEventListener('keydown', startGame);
+window.addEventListener('mousedown', (e)=>{ if(!started) startGame(); });
+window.addEventListener('touchstart', (e)=>{ if(!started){ startGame(); } }, {passive:true});
 
 // ── 시작 ──
 resize();
