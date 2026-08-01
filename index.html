@@ -2,810 +2,602 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>My RPG 3D - Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>월드 타워 워 (World Tower War)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
     width: 100%; height: 100%;
-    background: #1a1d24; overflow: hidden;
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    -webkit-user-select: none; user-select: none;
-    -webkit-tap-highlight-color: transparent;
+    background: #2b2b33;
+    font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
   }
-  #c { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: grab; }
-  #c:active { cursor: grabbing; }
-
-  #hud { position: fixed; top: 12px; left: 12px; display: flex; align-items: center; gap: 10px; pointer-events: none; }
-  #portrait {
-    width: 56px; height: 56px; border-radius: 50%;
-    background: #3a4364; border: 3px solid #c8a84b;
-    display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0;
-  }
-  #portrait .lv {
-    position: absolute; bottom: -4px; right: -4px;
-    background: #101216; color: #e6cd7e; border: 2px solid #c8a84b; border-radius: 50%;
-    width: 24px; height: 24px; font-size: 12px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-  }
-  #bars { display: flex; flex-direction: column; gap: 5px; }
-  .bar { width: 220px; height: 20px; border-radius: 10px; background: rgba(0,0,0,0.55); overflow: hidden; position: relative; border: 1px solid rgba(255,255,255,0.12); }
-  .bar .fill { height: 100%; width: 100%; transition: width 0.2s; }
-  .bar.hp .fill { background: linear-gradient(#e5584f,#b5352d); }
-  .bar.exp .fill { background: linear-gradient(#59b36b,#2e8b4a); }
-  .bar .txt { position: absolute; inset: 0; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; padding-left: 10px; text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
-  #stats { position: fixed; top: 78px; left: 12px; display: flex; gap: 12px; color: #d8d3c4; font-size: 13px; font-weight: 600; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
-  #hint { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); color: #aeb4c2; font-size: 13px; background: rgba(0,0,0,0.4); padding: 6px 14px; border-radius: 8px; pointer-events: none; }
-  #version { position: fixed; bottom: 10px; right: 14px; color: #8b90a0; font-size: 12px; pointer-events: none; }
-  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #aeb4c2; font-size: 15px; background: #1a1d24; }
-
-  /* ===== 오프닝 화면 ===== */
-  #opening {
-    position: fixed; inset: 0; z-index: 100; overflow: hidden;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    transition: opacity 0.7s ease, transform 0.7s ease;
-  }
-  #opening.hide { opacity: 0; transform: scale(1.06); pointer-events: none; }
-  .op-sky {
-    position: absolute; inset: 0;
-    background: linear-gradient(180deg, #10152b 0%, #1b2144 40%, #33245a 75%, #4a2f66 100%);
-  }
-  .op-stars {
-    position: absolute; inset: 0; opacity: 0.7;
-    background-image:
-      radial-gradient(1px 1px at 20% 30%, #fff, transparent),
-      radial-gradient(1px 1px at 60% 20%, #cfe0ff, transparent),
-      radial-gradient(1px 1px at 80% 40%, #fff, transparent),
-      radial-gradient(1px 1px at 35% 60%, #dfe8ff, transparent),
-      radial-gradient(1px 1px at 75% 70%, #fff, transparent),
-      radial-gradient(1px 1px at 10% 80%, #cfe0ff, transparent),
-      radial-gradient(1px 1px at 50% 85%, #fff, transparent);
-    animation: twinkle 4s ease-in-out infinite alternate;
-  }
-  @keyframes twinkle { from { opacity: 0.35; } to { opacity: 0.85; } }
-  .op-glow {
-    position: absolute; left: 50%; bottom: -30%; width: 120vw; height: 90vh;
-    transform: translateX(-50%);
-    background: radial-gradient(ellipse at center, rgba(120,90,200,0.55), rgba(80,60,150,0.15) 45%, transparent 70%);
-    filter: blur(8px);
-    animation: pulseGlow 6s ease-in-out infinite alternate;
-  }
-  @keyframes pulseGlow { from { opacity: 0.6; } to { opacity: 1; } }
-  .op-motes { position: absolute; inset: 0; pointer-events: none; }
-  .mote {
-    position: absolute; bottom: -20px; width: 6px; height: 6px; border-radius: 50%;
-    background: rgba(200,210,255,0.8); box-shadow: 0 0 8px rgba(180,200,255,0.9);
-    animation: rise linear infinite;
-  }
-  @keyframes rise {
-    0% { transform: translateY(0) translateX(0); opacity: 0; }
-    12% { opacity: 0.9; }
-    100% { transform: translateY(-105vh) translateX(30px); opacity: 0; }
-  }
-
-  .op-content { position: relative; z-index: 2; text-align: center; padding: 0 24px; }
-  .op-badges { display: flex; gap: 16px; justify-content: center; margin-bottom: 26px; }
-  .op-badge {
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    color: #cdd6f5; font-size: 12px; font-weight: 600;
-    animation: floaty 3.2s ease-in-out infinite;
-  }
-  .op-badge:nth-child(2) { animation-delay: 0.5s; }
-  .op-badge:nth-child(3) { animation-delay: 1s; }
-  .op-badge .ic {
-    width: 52px; height: 52px; border-radius: 14px;
-    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
-    display: flex; align-items: center; justify-content: center; font-size: 24px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
-  }
-  @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-
-  .op-title {
-    font-size: 64px; font-weight: 800; letter-spacing: 2px; color: #fff;
-    text-shadow: 0 2px 20px rgba(150,120,255,0.6), 0 0 40px rgba(120,90,220,0.4);
-    margin-bottom: 6px; animation: titleIn 1s ease both;
-  }
-  .op-title span { color: #c8a84b; text-shadow: 0 2px 20px rgba(220,180,90,0.7); }
-  @keyframes titleIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-  .op-sub { color: #aeb6d8; font-size: 14px; margin-bottom: 34px; animation: titleIn 1.2s ease both; }
-
-  .op-form {
-    display: flex; flex-direction: column; align-items: center; gap: 12px;
-    animation: titleIn 1.4s ease both;
-  }
-  .op-label { color: #cdd6f5; font-size: 13px; font-weight: 600; letter-spacing: 1px; }
-  .op-input {
-    width: 280px; max-width: 80vw; padding: 14px 18px; font-size: 17px; text-align: center;
-    border-radius: 12px; border: 2px solid rgba(255,255,255,0.25);
-    background: rgba(10,14,30,0.6); color: #fff; outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-  .op-input::placeholder { color: #7681a8; }
-  .op-input:focus { border-color: #c8a84b; box-shadow: 0 0 0 3px rgba(200,168,75,0.25); }
-  .op-btn {
-    width: 280px; max-width: 80vw; padding: 14px; font-size: 17px; font-weight: 700;
-    border: none; border-radius: 12px; cursor: pointer; color: #1a1224;
-    background: linear-gradient(135deg, #e6cd7e, #c8a84b);
-    box-shadow: 0 6px 20px rgba(200,168,75,0.4); transition: transform 0.12s, box-shadow 0.2s;
-  }
-  .op-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 26px rgba(200,168,75,0.55); }
-  .op-btn:active { transform: translateY(0); }
-  .op-warn { color: #ff8a8a; font-size: 12px; height: 14px; opacity: 0; transition: opacity 0.2s; }
-  .op-warn.show { opacity: 1; }
-  .op-foot { position: absolute; bottom: 16px; z-index: 2; color: #6b74a0; font-size: 12px; }
-
-  @media (max-width: 600px) {
-    .op-title { font-size: 44px; }
-    .op-badge .ic { width: 44px; height: 44px; font-size: 20px; }
-  }
-
-  /* ---- 터치 컨트롤 (기본 숨김, 모바일/태블릿에서만 표시) ---- */
-  #touchUI { display: none; }
-  #touchUI.on { display: block; }
-  #joyBase {
-    position: fixed; left: 34px; bottom: 40px;
-    width: 130px; height: 130px; border-radius: 50%;
-    background: rgba(20,24,34,0.35);
-    border: 3px solid rgba(255,255,255,0.55);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.4);
-    touch-action: none; z-index: 20;
-  }
-  #joyStick {
-    position: absolute; left: 50%; top: 50%;
-    width: 60px; height: 60px; border-radius: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(230,235,245,0.75);
-    border: 2px solid rgba(255,255,255,0.8);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-  }
-  #jumpBtn {
-    position: fixed; right: 40px; bottom: 52px;
-    width: 96px; height: 96px; border-radius: 50%;
-    background: rgba(26,60,42,0.55);
-    border: 3px solid rgba(255,255,255,0.55);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.4);
-    display: flex; align-items: center; justify-content: center;
-    color: #eafff0; font-size: 15px; font-weight: 700;
-    touch-action: none; z-index: 20; user-select: none;
-  }
-  #jumpBtn:active { background: rgba(40,90,62,0.75); transform: scale(0.94); }
-  #lockIcon {
-    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    display: none; align-items: center; justify-content: center;
-    pointer-events: none; z-index: 5;
-  }
-  #lockIcon .ring {
-    width: 22px; height: 22px; border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.85);
-    box-shadow: 0 0 6px rgba(0,0,0,0.6);
+  #game-wrap {
     position: relative;
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
   }
-  #lockIcon .ring::after {
-    content: ''; position: absolute; top: 50%; left: 50%;
-    width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,0.9);
-    transform: translate(-50%, -50%);
+  /* 캔버스: 게임 화면 */
+  #canvas {
+    display: block;
+    background: #ffffff;            /* 배경 흰색 (요청) */
+    touch-action: none;
+    box-shadow: 0 8px 40px rgba(0,0,0,.5);
+  }
+  /* 하단 컨트롤 바 (병사 생산 버튼 등) */
+  #ui {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    gap: 10px;
+    padding: 10px 14px;
+    background: linear-gradient(180deg, rgba(20,20,26,.0), rgba(20,20,26,.92) 30%);
+    align-items: flex-end;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .unit-btn {
+    position: relative;
+    width: 92px; height: 92px;
+    border: 2px solid #4a4a58;
+    border-radius: 12px;
+    background: #33333d;
+    color: #fff;
+    cursor: pointer;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 2px;
+    transition: transform .08s, border-color .15s;
+    overflow: hidden;
+  }
+  .unit-btn:hover { border-color: #7a7a90; }
+  .unit-btn:active { transform: scale(.95); }
+  .unit-btn:disabled { cursor: not-allowed; opacity: .55; }
+  .unit-btn .ic { font-size: 30px; line-height: 1; }
+  .unit-btn .ic-img { width: 44px; height: 44px; object-fit: contain; image-rendering: auto; }
+  .unit-btn .nm { font-size: 12px; font-weight: 700; }
+  .unit-btn .cost { font-size: 11px; color: #ffd54a; font-weight: 700; }
+  /* 쿨타임 오버레이 */
+  .unit-btn .cool {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,.6);
+    height: 0%;
+    pointer-events: none;
+  }
+  /* 상단 HUD */
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 14px; pointer-events: none;
+  }
+  .money {
+    background: rgba(20,20,26,.85);
+    color: #ffd54a; font-weight: 800; font-size: 18px;
+    padding: 6px 14px; border-radius: 20px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .money .bar {
+    width: 120px; height: 8px; background:#444; border-radius: 4px; overflow:hidden;
+  }
+  .money .bar > span { display:block; height:100%; background:#ffd54a; width:0%; }
+  #stage-name {
+    background: rgba(20,20,26,.85); color:#fff; font-weight:700; font-size:14px;
+    padding: 6px 14px; border-radius: 20px;
+  }
+  /* 결과 오버레이 */
+  #overlay {
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,.7);
+    z-index: 20;
+  }
+  #overlay .card {
+    background: #26262e; border: 2px solid #4a4a58; border-radius: 18px;
+    padding: 32px 40px; text-align: center; color: #fff;
+  }
+  #overlay h1 { font-size: 34px; margin-bottom: 8px; }
+  #overlay p { color:#bbb; margin-bottom: 20px; }
+  #overlay button {
+    background:#ffd54a; color:#26262e; border:none; font-weight:800;
+    font-size:16px; padding:12px 28px; border-radius:10px; cursor:pointer;
   }
 </style>
 </head>
 <body>
-  <!-- ===== 오프닝(타이틀) 화면 ===== -->
-  <div id="opening">
-    <div class="op-sky"></div>
-    <div class="op-stars"></div>
-    <div class="op-glow"></div>
-    <div class="op-motes" id="opMotes"></div>
-
-    <div class="op-content">
-      <div class="op-badges">
-        <div class="op-badge"><div class="ic">⚔️</div><span>레벨업</span></div>
-        <div class="op-badge"><div class="ic">🛡️</div><span>장비 강화</span></div>
-        <div class="op-badge"><div class="ic">🧭</div><span>여행</span></div>
-      </div>
-
-      <h1 class="op-title">채운 <span>RPG</span></h1>
-      <p class="op-sub">— 레벨을 올리고, 장비를 벼리고, 미지의 세계로 떠나라 —</p>
-
-      <div class="op-form">
-        <label class="op-label">주인공의 이름</label>
-        <input id="nameInput" class="op-input" type="text" maxlength="12"
-               placeholder="이름을 입력하세요" autocomplete="off" />
-        <button id="startBtn" class="op-btn">여행 시작</button>
-        <div class="op-warn" id="nameWarn">이름을 입력해 주세요</div>
-      </div>
-    </div>
-    <div class="op-foot">PROTO 3D · 채운 RPG</div>
-  </div>
-
-  <canvas id="c"></canvas>
+<div id="game-wrap">
+  <canvas id="canvas"></canvas>
 
   <div id="hud">
-    <div id="portrait"><span style="font-size:24px">🙂</span><div class="lv" id="lvBadge">1</div></div>
-    <div id="bars">
-      <div class="bar hp"><div class="fill" id="hpFill"></div><div class="txt" id="hpTxt">HP</div></div>
-      <div class="bar exp"><div class="fill" id="expFill"></div><div class="txt" id="expTxt">EXP</div></div>
+    <div class="money">💰 <span id="money-val">0</span>
+      <div class="bar"><span id="money-bar"></span></div>
+    </div>
+    <div id="stage-name">🇰🇷 한국 남산타워 &nbsp;VS&nbsp; 프랑스 에펠탑 🇫🇷</div>
+  </div>
+
+  <div id="ui"><!-- 병사 버튼 JS로 생성 --></div>
+
+  <div id="overlay">
+    <div class="card">
+      <h1 id="overlay-title">승리!</h1>
+      <p id="overlay-sub"></p>
+      <button onclick="restart()">다시 시작</button>
     </div>
   </div>
-  <div id="stats"><span id="nameTxt" style="color:#e6cd7e">주인공</span><span id="atkTxt">공격력 10</span><span id="goldTxt">골드 0</span></div>
-  <div id="hint">이동: WASD / 방향키 · 시점: 마우스 드래그 · 줌: 휠 · Shift: 시점 고정 · Space: 점프</div>
-  <div id="lockIcon"><div class="ring"></div></div>
-  <div id="version">PROTO 3D 0.1</div>
-  <div id="loading">3D 엔진 불러오는 중…</div>
+</div>
 
-  <!-- 모바일/태블릿 전용 터치 컨트롤 (자동 표시) -->
-  <div id="touchUI">
-    <div id="joyBase"><div id="joyStick"></div></div>
-    <div id="jumpBtn"><span>점프</span></div>
-  </div>
+<script>
+/* =========================================================================
+   월드 타워 워 — 냥코 스타일 프로토타입 (PC용)
+   구조 요약
+   - GAME_W/H 좌표계로 그리고, 화면 크기에 맞춰 스케일 (반응형 준비 완료)
+   - 유닛(병사)은 좌→우(플레이어) / 우→좌(적)로 자동 전진, 만나면 자동 공격
+   - 돈이 시간에 따라 차오르고, 버튼으로 병사 생산(쿨타임 있음)
+   - 타워 체력 0 되면 승/패
+   - drawUnit()에 GIF/스프라이트 끼울 자리 표시해 둠 (지금은 도형)
+   ========================================================================= */
 
-<script type="importmap">
-{ "imports": {
-  "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-} }
-</script>
+const cv = document.getElementById('canvas');
+const ctx = cv.getContext('2d');
 
-<script type="module">
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
-/* =========================================================
-   전역 상태 — 나중에 몹/스킬/아이템은 여기에 추가
-   ========================================================= */
-const player = {
-  name: '주인공',
-  hp: 100, maxHp: 100, exp: 0, maxExp: 100,
-  level: 1, atk: 10, gold: 0,
-  speed: 6, moving: false, animTime: 0,
-  // 점프 물리
-  y: 0, vy: 0, onGround: true,
-  jumpPower: 9, gravity: 26,
+/* ── 사운드 훅 (assets/sfx/에 파일 넣으면 자동 재생) ──
+   나중에 파일을 넣고 이 목록에 등록하면 playSfx('spawn') 형태로 호출 가능.
+   파일이 없어도 오류 없이 조용히 무시된다. */
+const SFX = {
+  // spawn:     'assets/sfx/spawn.mp3',
+  // attack:    'assets/sfx/attack.mp3',
+  // tower_hit: 'assets/sfx/tower_hit.mp3',
+  // win:       'assets/sfx/win.mp3',
+  // lose:      'assets/sfx/lose.mp3',
 };
-const keys = {};
-// 가상 조이스틱 입력 (-1~1). 터치로 갱신됨
-const joy = { x: 0, z: 0, active: false };
-let isTouch = false;
-let gameStarted = false;
+const _sfxCache = {};
+function playSfx(key){
+  const src = SFX[key];
+  if (!src) return;                     // 아직 등록 안 됨 → 무시
+  try {
+    let a = _sfxCache[key];
+    if (!a){ a = new Audio(src); _sfxCache[key] = a; }
+    a.currentTime = 0; a.play().catch(()=>{});
+  } catch(e){}
+}
 
-// 카메라 궤도 파라미터
-const cam = { yaw: 0, pitch: 0.9, dist: 12, minDist: 6, maxDist: 22, shiftLock: false };
+// ── 내부 게임 해상도(좌표계). 실제 화면은 여기에 맞춰 스케일된다. ──
+const GAME_W = 1280;
+const GAME_H = 720;
+const GROUND_Y = 560;          // 병사들이 서는 바닥 y
+let scale = 1, offX = 0, offY = 0;
 
-let renderer, scene, camera, hero, clock;
-let heroParts = {};
-let mixer = null;              // 애니메이션 믹서 (모델에 애니 있을 때)
-let actions = {};              // 이름별 애니메이션 액션
-let currentAction = null;
+// ── 반응형: 창 크기에 맞춰 캔버스 리사이즈 + 스케일 계산 ──
+function resize() {
+  const wrap = document.getElementById('game-wrap');
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  cv.width = w; cv.height = h;
+  // GAME_W:GAME_H 비율을 유지하며 화면에 꽉 차게(letterbox)
+  scale = Math.min(w / GAME_W, h / GAME_H);
+  offX = (w - GAME_W * scale) / 2;
+  offY = (h - GAME_H * scale) / 2;
+}
+window.addEventListener('resize', resize);
 
-/* =========================================================
-   3D 모델 설정 — 여기만 바꾸면 캐릭터 교체됨
-   모델 파일 위치: index.html 과 같은 곳에 assets/models/ 폴더를 만들고
-   그 안에 01_512.glb 를 넣으세요. (예: 프로젝트폴더/assets/models/01_512.glb)
-   MODEL_URL 을 비우면('') 임시 캐릭터가 나옵니다.
-   ========================================================= */
-const MODEL_URL = './assets/models/01_512.glb';   // 주인공 모델 (assets/models 폴더)
-const MODEL_SCALE = 1.0;      // 수동 크기 보정 (AUTO_FIT이 false일 때 사용)
-const MODEL_Y = 0;            // 수동 바닥 보정 (AUTO_FIT이 false일 때 사용)
-const AUTO_FIT = true;        // true면 모델 크기·바닥 위치를 자동으로 맞춤
-const TARGET_HEIGHT = 4.3;    // 목표 캐릭터 키(유닛). 카메라/이름표 기준에 맞춘 값
-// 애니메이션 클립 이름 매핑 (모델마다 다름 — 콘솔 로그 보고 맞추세요)
-const ANIM_NAMES = { idle: ['idle','Idle','Armature|idle','대기'], walk: ['walk','Walk','run','Run','걷기'] };
+/* =========================================================================
+   유닛(병종) 정의 — 여기 값만 바꾸면 밸런스 조정됨
+   ple: 근접 / 원거리 여부, 사거리(range), 데미지, 체력, 속도, 비용, 쿨타임
+   gif 필드에 이미지 경로를 넣으면 도형 대신 그 이미지를 쓰도록 되어 있음
+   ========================================================================= */
+// 프레임 PNG 경로 목록 생성: assets/characters/{char}/{char}_{action}_{i}.png
+function frameList(char, action, count){
+  const arr=[];
+  for(let i=0;i<count;i++)
+    arr.push(`assets/characters/${char}/${char}_${action}_${i}.png`);
+  return arr;
+}
 
-// 게임 준비: 3D 씬은 미리 초기화하고, 실제 시작은 오프닝에서 버튼을 눌러야 진행
-init();
-setupOpening();
+const UNIT_TYPES = {
+  // ── 포치타: 근접 공격 캐릭터 (스프라이트 GIF 사용) ──
+  // 원본 그림이 왼쪽을 보고 있어 faceLeft:true → 플레이어(오른쪽 전진)일 때 좌우반전
+  pochita: {
+    name: '포치타', icon: '🐷', color: '#e74c3c',
+    hp: 140, dmg: 20, atkSpeed: 0.55, range: 62, speed: 80,
+    cost: 45, cooldown: 2.0, radius: 30,
+    // GIF는 미리보기/외부용. 게임 안에서는 아래 프레임 PNG를 직접 애니메이션한다
+    // (canvas의 drawImage는 GIF 첫 프레임만 그리기 때문)
+    gifWalk: 'assets/characters/pochita/pochita_run.gif',
+    gifAtk:  'assets/characters/pochita/pochita_attack.gif',
+    framesWalk: frameList('pochita','run',6),
+    framesAtk:  frameList('pochita','attack',6),
+    fpsWalk: 11, fpsAtk: 12,
+    faceLeft: true,   // 그림 기본 방향이 왼쪽
+    drawScale: 2.6,   // 도형 대비 이미지 크기 배율
+  },
+  melee: {
+    name: '보병', icon: '🗡️', color: '#3a7bd5',
+    hp: 120, dmg: 18, atkSpeed: 0.6, range: 60, speed: 70,
+    cost: 40, cooldown: 2.2, radius: 26,
+    gifWalk: null,   // 예: 'assets/soldier_walk.gif'
+    gifAtk:  null,   // 예: 'assets/soldier_atk.gif'
+  },
+  ranged: {
+    name: '궁수', icon: '🏹', color: '#8e44ad',
+    hp: 70, dmg: 12, atkSpeed: 0.9, range: 200, speed: 60,
+    cost: 70, cooldown: 4.0, radius: 22,
+    gifWalk: null, gifAtk: null,
+  },
+  tank: {
+    name: '방패병', icon: '🛡️', color: '#2c9c6a',
+    hp: 320, dmg: 10, atkSpeed: 0.7, range: 55, speed: 45,
+    cost: 90, cooldown: 6.0, radius: 32,
+    gifWalk: null, gifAtk: null,
+  },
+};
 
-/* ===== 오프닝 화면 로직 ===== */
-function setupOpening() {
-  // 떠다니는 입자 생성
-  const motes = document.getElementById('opMotes');
-  for (let i = 0; i < 22; i++) {
-    const m = document.createElement('div');
-    m.className = 'mote';
-    m.style.left = Math.random() * 100 + '%';
-    m.style.animationDuration = (6 + Math.random() * 8) + 's';
-    m.style.animationDelay = (Math.random() * 8) + 's';
-    const s = 3 + Math.random() * 5;
-    m.style.width = s + 'px'; m.style.height = s + 'px';
-    motes.appendChild(m);
-  }
+// ── 타워(각 국가 시그니처 건물) 정의 ──
+const TOWERS = {
+  player: { name: '남산타워',  emoji: '🗼', x: 90,        maxHp: 1500, color:'#e74c3c' },
+  enemy:  { name: '에펠탑',    emoji: '🏛️', x: GAME_W-90,  maxHp: 1500, color:'#2c3e50' },
+};
 
-  const input = document.getElementById('nameInput');
-  const btn = document.getElementById('startBtn');
-  const warn = document.getElementById('nameWarn');
-
-  const start = () => {
-    const name = input.value.trim();
-    if (!name) {
-      warn.classList.add('show');
-      input.focus();
-      return;
-    }
-    warn.classList.remove('show');
-    startGame(name);
+// ── 게임 상태 ──
+let state;
+function initState() {
+  state = {
+    money: 150, maxMoney: 999,
+    moneyRate: 22,           // 초당 돈 회복
+    units: [],               // 전장 위 모든 병사
+    projectiles: [],         // 원거리 발사체
+    towerHp: { player: TOWERS.player.maxHp, enemy: TOWERS.enemy.maxHp },
+    cooldowns: { melee:0, ranged:0, tank:0 },
+    enemyTimer: 0,           // 적 AI 스폰 타이머
+    over: false, last: performance.now(),
   };
-
-  btn.addEventListener('click', start);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') start(); });
-  input.addEventListener('input', () => warn.classList.remove('show'));
-  setTimeout(() => input.focus(), 400);
 }
 
-/* ===== 이름 확정 → 게임 시작 ===== */
-function startGame(name) {
-  player.name = name;
-  gameStarted = true;
-  // 이름표 갱신
-  if (heroParts.label && heroParts.label.parent) {
-    heroParts.label.parent.remove(heroParts.label);
-    attachLabel(hero);
-  }
-  updateHUD();
-
-  // 오프닝 페이드아웃 후 제거
-  const op = document.getElementById('opening');
-  op.classList.add('hide');
-  setTimeout(() => { op.style.display = 'none'; }, 700);
-}
-
-function init() {
-  const canvas = document.getElementById('c');
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x2b2f3a);
-  scene.fog = new THREE.Fog(0x2b2f3a, 40, 90);
-
-  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
-
-  buildLights();
-  buildGround();
-  loadHero();          // 모델 로드 시도 (실패/미지정 시 임시 캐릭터)
-
-  clock = new THREE.Clock();
-  bindInput(canvas);
-  window.addEventListener('resize', onResize);
-
-  document.getElementById('loading').style.display = 'none';
-  updateHUD();
-  renderer.setAnimationLoop(loop);
-}
-
-/* ---- 캐릭터 로드: 모델 URL 있으면 불러오고, 없으면 임시 캐릭터 ---- */
-function loadHero() {
-  // 이동/회전은 항상 이 컨테이너(hero)를 기준으로 동작
-  hero = new THREE.Group();
-  scene.add(hero);
-
-  if (!MODEL_URL) {
-    hero.add(buildPlaceholder());
-    return;
-  }
-
-  document.getElementById('loading').style.display = 'flex';
-  document.getElementById('loading').textContent = '캐릭터 모델 불러오는 중…';
-
-  const loader = new GLTFLoader();
-  loader.load(
-    MODEL_URL,
-    (gltf) => {
-      const model = gltf.scene;
-      model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-
-      // 1) 수동 스케일 먼저 적용
-      model.scale.setScalar(MODEL_SCALE);
-
-      // 2) 자동 맞춤: 캐릭터 목표 키에 맞춰 크기 보정 + 발을 바닥(y=0)에
-      if (AUTO_FIT) {
-        model.updateWorldMatrix(true, true);
-        let box = new THREE.Box3().setFromObject(model);
-        const height = box.max.y - box.min.y;
-        if (height > 0) {
-          const k = TARGET_HEIGHT / height;
-          model.scale.multiplyScalar(k);
-          model.updateWorldMatrix(true, true);
-          box = new THREE.Box3().setFromObject(model);
-        }
-        // 발끝이 y=0에 오도록, 그리고 좌우/앞뒤 중심을 원점으로
-        const center = box.getCenter(new THREE.Vector3());
-        model.position.x -= center.x;
-        model.position.z -= center.z;
-        model.position.y -= box.min.y;
-      } else {
-        model.position.y = MODEL_Y;
-      }
-
-      hero.add(model);
-
-      // 애니메이션 준비
-      if (gltf.animations && gltf.animations.length) {
-        mixer = new THREE.AnimationMixer(model);
-        console.log('사용 가능한 애니메이션:', gltf.animations.map(a => a.name));
-        gltf.animations.forEach(clip => { actions[clip.name] = mixer.clipAction(clip); });
-        playAnim('idle');
-      } else {
-        console.log('이 모델에는 애니메이션이 없습니다. (걷기/대기 없음)');
-      }
-      // 이름표 다시 부착
-      attachLabel(hero);
-      document.getElementById('loading').style.display = 'none';
-    },
-    (xhr) => {
-      if (xhr.total) {
-        const pct = Math.round(xhr.loaded / xhr.total * 100);
-        document.getElementById('loading').textContent = '캐릭터 모델 불러오는 중… ' + pct + '%';
-      }
-    },
-    (err) => {
-      console.warn('모델 로드 실패, 임시 캐릭터 사용:', err);
-      hero.add(buildPlaceholder());
-      document.getElementById('loading').style.display = 'none';
-    }
-  );
-}
-
-/* 클립 이름 후보 중 존재하는 것을 재생 */
-function playAnim(kind) {
-  if (!mixer) return;
-  const candidates = ANIM_NAMES[kind] || [];
-  let name = candidates.find(n => actions[n]);
-  if (!name) return;
-  const next = actions[name];
-  if (currentAction === next) return;
-  if (currentAction) currentAction.fadeOut(0.2);
-  next.reset().fadeIn(0.2).play();
-  currentAction = next;
-}
-
-/* ---- 조명 ---- */
-function buildLights() {
-  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-  sun.position.set(15, 25, 10);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  const s = 30;
-  sun.shadow.camera.left = -s; sun.shadow.camera.right = s;
-  sun.shadow.camera.top = s; sun.shadow.camera.bottom = -s;
-  scene.add(sun);
-}
-
-/* ---- 바닥: 체커보드 타일 ---- */
-function buildGround() {
-  const size = 120, tiles = 30, step = size / tiles;
-  const group = new THREE.Group();
-  const geo = new THREE.PlaneGeometry(step, step);
-  const matA = new THREE.MeshStandardMaterial({ color: 0x6b7080 });
-  const matB = new THREE.MeshStandardMaterial({ color: 0x61667a });
-  for (let x = 0; x < tiles; x++) {
-    for (let z = 0; z < tiles; z++) {
-      const m = new THREE.Mesh(geo, (x + z) % 2 ? matA : matB);
-      m.rotation.x = -Math.PI / 2;
-      m.position.set((x - tiles/2) * step + step/2, 0, (z - tiles/2) * step + step/2);
-      m.receiveShadow = true;
-      group.add(m);
-    }
-  }
-  scene.add(group);
-}
-
-/* ---- 임시 캐릭터: 원통·구를 섞어 각을 줄인 버전 (모델 없을 때 표시) ---- */
-function buildPlaceholder() {
-  const g = new THREE.Group();
-  const mat = (color, opts={}) => new THREE.MeshStandardMaterial({ color, roughness: 0.7, ...opts });
-  const boxMesh = (w, h, d, color, r=0.08) => {
-    // 모서리를 살짝 깎은 박스 대신 얇은 세그먼트 박스로 부드러운 느낌
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
-    return m;
-  };
-  const cyl = (rt, rb, h, color) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 16), mat(color));
-  const sph = (r, color) => new THREE.Mesh(new THREE.SphereGeometry(r, 20, 16), mat(color));
-  const add = (mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.castShadow = true; g.add(mesh); return mesh; };
-
-  const C = {
-    jacket: 0x1a1c26, jacketShade: 0x141620,
-    pants: 0x171922, pantsShade: 0x121319, shoe: 0x0d0e13,
-    skin: 0xf0cbab, hair: 0xe8ecf2, hairShade: 0xc9d2e0, eye: 0x3f9fe0,
-  };
-
-  // 다리 (원통 + 발끝 구)
-  heroParts.legL = add(cyl(0.22, 0.20, 1.5, C.pants), -0.3, 0.85, 0);
-  heroParts.legR = add(cyl(0.22, 0.20, 1.5, C.pantsShade), 0.3, 0.85, 0);
-  // 신발 (납작한 구 느낌)
-  const shoeL = add(sph(0.28, C.shoe), -0.3, 0.16, 0.12); shoeL.scale.set(1, 0.55, 1.4);
-  const shoeR = add(sph(0.28, C.shoe),  0.3, 0.16, 0.12); shoeR.scale.set(1, 0.55, 1.4);
-
-  // 골반/몸통 아래
-  add(cyl(0.4, 0.45, 0.5, C.jacket), 0, 1.75, 0);
-  // 몸통 (윗쪽이 넓은 원통 + 앞면 지퍼)
-  const torso = add(cyl(0.5, 0.45, 1.3, C.jacket), 0, 2.5, 0);
-  add(boxMesh(0.05, 1.2, 0.04, C.jacketShade), 0, 2.5, 0.46); // 지퍼선
-  // 어깨 구 (부드러운 연결)
-  add(sph(0.28, C.jacket), -0.55, 3.0, 0);
-  add(sph(0.28, C.jacketShade), 0.55, 3.0, 0);
-  // 하이넥 칼라
-  add(cyl(0.34, 0.42, 0.5, C.jacket), 0, 3.35, 0);
-  add(cyl(0.28, 0.3, 0.3, 0x0e0f16), 0, 3.45, -0.05);
-
-  // 팔 (원통 + 팔꿈치/손 구)
-  heroParts.armL = add(cyl(0.17, 0.15, 1.4, C.jacket), -0.72, 2.5, 0.02);
-  heroParts.armR = add(cyl(0.17, 0.15, 1.4, C.jacketShade), 0.72, 2.5, 0.02);
-  add(sph(0.16, C.skin), -0.72, 1.78, 0.05); // 손
-  add(sph(0.16, C.skin),  0.72, 1.78, 0.05);
-
-  // 목
-  add(cyl(0.16, 0.18, 0.3, C.skin), 0, 3.62, 0);
-
-  // 머리 (구 기반 — 각 없음)
-  const head = add(sph(0.55, C.skin), 0, 4.15, 0); head.scale.set(0.95, 1.05, 0.98);
-  // 머리카락 (구를 눌러 덮개처럼 + 앞머리 뭉치)
-  const hairTop = add(sph(0.6, C.hair), 0, 4.3, -0.02); hairTop.scale.set(1, 0.85, 1);
-  add(sph(0.2, C.hairShade), -0.34, 4.25, 0.42);
-  add(sph(0.22, C.hairShade), 0.02, 4.32, 0.46);
-  add(sph(0.18, C.hairShade), 0.36, 4.22, 0.42);
-  // 파란 눈 (작은 구)
-  const eyeL = add(sph(0.09, C.eye), -0.2, 4.12, 0.46); eyeL.scale.set(1, 1.2, 0.5);
-  const eyeR = add(sph(0.09, C.eye),  0.2, 4.12, 0.46); eyeR.scale.set(1, 1.2, 0.5);
-
-  attachLabel(g);
-  return g;
-}
-
-/* 이름표를 컨테이너에 부착 */
-function attachLabel(container) {
-  const label = makeLabel('Lv.' + player.level + ' ' + player.name);
-  label.position.set(0, 5.4, 0);
-  container.add(label);
-  heroParts.label = label;
-}
-
-function makeLabel(text) {
-  const cv = document.createElement('canvas');
-  cv.width = 256; cv.height = 64;
-  const c = cv.getContext('2d');
-  c.fillStyle = 'rgba(0,0,0,0.5)';
-  c.fillRect(0, 16, 256, 32);
-  c.fillStyle = '#fff'; c.font = 'bold 22px sans-serif';
-  c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillText(text, 128, 34);
-  const tex = new THREE.CanvasTexture(cv);
-  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
-  spr.scale.set(4, 1, 1);
-  return spr;
-}
-
-/* =========================================================
-   입력
-   ========================================================= */
-function bindInput(canvas) {
-  window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
-  window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-  let dragging = false, lx = 0, ly = 0;
-  const start = (x, y) => { dragging = true; lx = x; ly = y; };
-  const move = (x, y) => {
-    // 시프트락이면 드래그 없이도 회전, 아니면 드래그 중에만
-    if (!dragging && !cam.shiftLock) { lx = x; ly = y; return; }
-    cam.yaw -= (x - lx) * 0.005;
-    // 위아래 반전: 마우스를 위로 올리면 시점도 위로
-    cam.pitch = Math.max(0.25, Math.min(1.4, cam.pitch + (y - ly) * 0.005));
-    lx = x; ly = y;
-  };
-  const end = () => dragging = false;
-
-  canvas.addEventListener('mousedown', e => start(e.clientX, e.clientY));
-  window.addEventListener('mousemove', e => move(e.clientX, e.clientY));
-  window.addEventListener('mouseup', end);
-  canvas.addEventListener('wheel', e => {
-    cam.dist = Math.max(cam.minDist, Math.min(cam.maxDist, cam.dist + e.deltaY * 0.01));
-    e.preventDefault();
-  }, { passive: false });
-
-  // 우클릭 컨텍스트 메뉴 차단
-  canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-  // Shift 락 토글 (로블록스 시프트락): 켜지면 캐릭터가 카메라 정면을 바라봄
-  window.addEventListener('keydown', e => {
-    if (e.key === 'Shift' && !e.repeat) {
-      cam.shiftLock = !cam.shiftLock;
-      document.getElementById('lockIcon').style.display = cam.shiftLock ? 'flex' : 'none';
-    }
-    // 스페이스바 점프 (PC)
-    if (e.code === 'Space' && !e.repeat) { e.preventDefault(); doJump(); }
+/* ── 병사 스폰 ── side: 'player' | 'enemy' ── */
+function spawnUnit(typeKey, side) {
+  const t = UNIT_TYPES[typeKey];
+  const fromX = side === 'player' ? TOWERS.player.x + 40 : TOWERS.enemy.x - 40;
+  state.units.push({
+    type: typeKey, side,
+    x: fromX, y: GROUND_Y,
+    hp: t.hp, maxHp: t.hp,
+    atkTimer: 0, anim: 0,
+    state: 'walk',           // walk | attack
   });
-
-  // 터치(태블릿/모바일 시점 회전) — 조이스틱/버튼 위 터치는 그 요소가 처리하므로 여기선 캔버스 터치만
-  canvas.addEventListener('touchstart', e => { const t = e.changedTouches[0]; start(t.clientX, t.clientY); }, { passive: true });
-  canvas.addEventListener('touchmove', e => { const t = e.changedTouches[0]; move(t.clientX, t.clientY); }, { passive: true });
-  canvas.addEventListener('touchend', end);
-
-  setupTouchControls();
 }
 
-/* ---- 터치 컨트롤: 기기 자동 감지 → 조이스틱 + 점프 버튼 ---- */
-function setupTouchControls() {
-  // 터치 지원 여부로 모바일/태블릿 자동 인식
-  isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-  if (!isTouch) return;
-
-  document.getElementById('touchUI').classList.add('on');
-  // 힌트 문구를 터치용으로 교체
-  document.getElementById('hint').textContent = '왼쪽 원: 이동 · 오른쪽 버튼: 점프 · 화면 드래그: 시점';
-
-  const base = document.getElementById('joyBase');
-  const stick = document.getElementById('joyStick');
-  const jump = document.getElementById('jumpBtn');
-  const R = 45; // 조이스틱 최대 반경(px)
-  let joyId = null;
-
-  const setStick = (dx, dy) => {
-    const len = Math.hypot(dx, dy);
-    const cl = Math.min(len, R);
-    const ang = Math.atan2(dy, dx);
-    const sx = Math.cos(ang) * cl, sy = Math.sin(ang) * cl;
-    stick.style.transform = `translate(calc(-50% + ${sx}px), calc(-50% + ${sy}px))`;
-    // 입력값 정규화 (-1~1). 화면 위쪽(-y)이 앞(+z 입력)
-    joy.x = (dx / R); joy.z = (dy / R);
-    joy.x = Math.max(-1, Math.min(1, joy.x));
-    joy.z = Math.max(-1, Math.min(1, joy.z));
-    joy.active = true;
-  };
-  const resetStick = () => {
-    stick.style.transform = 'translate(-50%, -50%)';
-    joy.x = 0; joy.z = 0; joy.active = false; joyId = null;
-  };
-
-  base.addEventListener('touchstart', e => {
-    const t = e.changedTouches[0]; joyId = t.identifier;
-    const r = base.getBoundingClientRect();
-    setStick(t.clientX - (r.left + r.width/2), t.clientY - (r.top + r.height/2));
-    e.preventDefault();
-  }, { passive: false });
-  base.addEventListener('touchmove', e => {
-    for (const t of e.changedTouches) {
-      if (t.identifier !== joyId) continue;
-      const r = base.getBoundingClientRect();
-      setStick(t.clientX - (r.left + r.width/2), t.clientY - (r.top + r.height/2));
-    }
-    e.preventDefault();
-  }, { passive: false });
-  base.addEventListener('touchend', e => {
-    for (const t of e.changedTouches) if (t.identifier === joyId) resetStick();
-    e.preventDefault();
-  }, { passive: false });
-  base.addEventListener('touchcancel', resetStick);
-
-  jump.addEventListener('touchstart', e => { doJump(); e.preventDefault(); }, { passive: false });
+/* ── 플레이어 병사 생산(버튼) ── */
+function tryProduce(typeKey) {
+  if (state.over) return;
+  const t = UNIT_TYPES[typeKey];
+  if (state.money < t.cost) return;
+  if (state.cooldowns[typeKey] > 0) return;
+  state.money -= t.cost;
+  state.cooldowns[typeKey] = t.cooldown;
+  spawnUnit(typeKey, 'player');
 }
 
-/* ---- 점프 실행 (PC 스페이스바 / 모바일 버튼 공용) ---- */
-function doJump() {
-  if (player.onGround) {
-    player.vy = player.jumpPower;
-    player.onGround = false;
-  }
-}
+/* =========================================================================
+   업데이트 (물리/전투 로직)
+   ========================================================================= */
+function update(dt) {
+  if (state.over) return;
 
-/* =========================================================
-   메인 루프
-   ========================================================= */
-function loop() {
-  const dt = Math.min(clock.getDelta(), 0.05);
-  updatePlayer(dt);
-  if (mixer) mixer.update(dt);
-  updateCamera();
-  renderer.render(scene, camera);
-}
+  // 돈 회복
+  state.money = Math.min(state.maxMoney, state.money + state.moneyRate * dt);
 
-function updatePlayer(dt) {
-  // 오프닝 중에는 조작 무시
-  if (!gameStarted) return;
-  // 카메라 기준 이동 방향 계산 (키보드 + 조이스틱)
-  let ix = 0, iz = 0;
-  if (keys['w'] || keys['arrowup']) iz -= 1;
-  if (keys['s'] || keys['arrowdown']) iz += 1;
-  if (keys['a'] || keys['arrowleft']) ix -= 1;
-  if (keys['d'] || keys['arrowright']) ix += 1;
-  // 조이스틱: 화면 위로 밀면 앞으로(iz-), 오른쪽이면 ix+
-  if (joy.active) { ix += joy.x; iz += joy.z; }
+  // 쿨타임 감소
+  for (const k in state.cooldowns)
+    state.cooldowns[k] = Math.max(0, state.cooldowns[k] - dt);
 
-  player.moving = (Math.abs(ix) > 0.001 || Math.abs(iz) > 0.001);
-
-  // 시프트락: 캐릭터가 항상 카메라 정면을 바라봄 (이동 여부와 무관)
-  if (cam.shiftLock) {
-    let cur = hero.rotation.y;
-    let diff = ((cam.yaw - cur + Math.PI) % (Math.PI * 2)) - Math.PI;
-    hero.rotation.y = cur + diff * Math.min(1, dt * 16);
+  // 적 AI: 주기적으로 랜덤 병사 스폰 (난이도 = 스폰 간격)
+  state.enemyTimer -= dt;
+  if (state.enemyTimer <= 0) {
+    const pool = ['melee','melee','ranged','tank'];
+    spawnUnit(pool[Math.floor(Math.random()*pool.length)], 'enemy');
+    state.enemyTimer = 2.4 + Math.random()*1.6;
   }
 
-  let bob = 0;
-  if (player.moving) {
-    let len = Math.hypot(ix, iz); if (len > 1) { ix /= len; iz /= len; }
-    // 카메라 yaw 기준으로 이동 방향 회전
-    const sin = Math.sin(cam.yaw), cos = Math.cos(cam.yaw);
-    const wx = ix * cos - iz * sin;
-    const wz = ix * sin + iz * cos;
-    hero.position.x += wx * player.speed * dt;
-    hero.position.z += wz * player.speed * dt;
+  // 각 유닛 처리
+  for (const u of state.units) {
+    if (u.hp <= 0) continue;
+    const t = UNIT_TYPES[u.type];
+    const dir = u.side === 'player' ? 1 : -1;
 
-    // 시프트락이 아니면 진행 방향으로 몸 회전
-    if (!cam.shiftLock) {
-      const target = Math.atan2(wx, wz);
-      let cur = hero.rotation.y;
-      let diff = ((target - cur + Math.PI) % (Math.PI * 2)) - Math.PI;
-      hero.rotation.y = cur + diff * Math.min(1, dt * 12);
-    }
+    // 사거리 내 가장 가까운 적 탐색
+    const target = findTarget(u, t);
 
-    player.animTime += dt;
-    playAnim('walk');
-    // 임시 캐릭터일 때만 팔다리 스윙 (지면에 있을 때만 bob)
-    if (!mixer && heroParts.legL) {
-      const sw = Math.sin(player.animTime * 10) * 0.5;
-      heroParts.legL.rotation.x = sw;
-      heroParts.legR.rotation.x = -sw;
-      heroParts.armL.rotation.x = -sw;
-      heroParts.armR.rotation.x = sw;
-      if (player.onGround) bob = Math.abs(Math.sin(player.animTime * 10)) * 0.12;
+    u.anim += dt;  // 애니메이션은 걷기/공격 모두에서 진행
+
+    if (target) {
+      u.state = 'attack';
+      u.atkTimer -= dt;
+      if (u.atkTimer <= 0) {
+        u.atkTimer = t.atkSpeed;
+        if (t.range > 120) {
+          // 원거리: 발사체 생성
+          state.projectiles.push({
+            x: u.x, y: u.y - 20,
+            tx: target.ref, side: u.side, dmg: t.dmg, speed: 520,
+          });
+        } else {
+          // 근접: 즉시 데미지
+          dealDamage(target.ref, t.dmg);
+        }
+      }
+    } else {
+      // 목표 없음 → 전진
+      u.state = 'walk';
+      u.x += dir * t.speed * dt;
     }
+  }
+
+  // 발사체 이동/명중
+  for (const p of state.projectiles) {
+    if (p.dead) continue;
+    const tgtX = targetX(p.tx);
+    const tgtY = targetY(p.tx) - 20;
+    const dx = tgtX - p.x, dy = tgtY - p.y;
+    const dist = Math.hypot(dx, dy);
+    const step = p.speed * dt;
+    if (dist <= step || isDead(p.tx)) {
+      if (!isDead(p.tx)) dealDamage(p.tx, p.dmg);
+      p.dead = true;
+    } else {
+      p.x += dx/dist*step; p.y += dy/dist*step;
+    }
+  }
+
+  // 죽은 것 정리
+  state.units = state.units.filter(u => u.hp > 0);
+  state.projectiles = state.projectiles.filter(p => !p.dead);
+
+  // 승패 판정
+  if (state.towerHp.enemy <= 0)  endGame(true);
+  if (state.towerHp.player <= 0) endGame(false);
+}
+
+/* 사거리 내 타겟 찾기 (적 유닛 또는 적 타워). ref는 유닛객체 또는 'tower:side' */
+function findTarget(u, t) {
+  const dir = u.side === 'player' ? 1 : -1;
+  const enemySide = u.side === 'player' ? 'enemy' : 'player';
+  let best = null, bestDist = Infinity;
+
+  // 적 유닛
+  for (const e of state.units) {
+    if (e.side === u.side || e.hp <= 0) continue;
+    const gap = (e.x - u.x) * dir;          // 앞쪽에 있는가
+    const absd = Math.abs(e.x - u.x);
+    if (gap >= -10 && absd <= t.range && absd < bestDist) {
+      best = { ref: e }; bestDist = absd;
+    }
+  }
+  // 적 타워
+  const towerX = TOWERS[enemySide].x;
+  const gapT = (towerX - u.x) * dir;
+  const absT = Math.abs(towerX - u.x);
+  if (gapT >= -10 && absT <= t.range && absT < bestDist) {
+    best = { ref: 'tower:'+enemySide };
+  }
+  return best;
+}
+
+// ref 헬퍼들 (유닛 객체 또는 'tower:side' 문자열 모두 처리)
+function targetX(ref){ return typeof ref==='string' ? TOWERS[ref.split(':')[1]].x : ref.x; }
+function targetY(ref){ return typeof ref==='string' ? GROUND_Y : ref.y; }
+function isDead(ref){ return typeof ref==='string' ? state.towerHp[ref.split(':')[1]]<=0 : ref.hp<=0; }
+function dealDamage(ref, dmg){
+  if (typeof ref === 'string') {
+    const side = ref.split(':')[1];
+    state.towerHp[side] = Math.max(0, state.towerHp[side] - dmg);
   } else {
-    playAnim('idle');
-    if (!mixer && heroParts.legL) {
-      heroParts.legL.rotation.x = heroParts.legR.rotation.x = 0;
-      heroParts.armL.rotation.x = heroParts.armR.rotation.x = 0;
-    }
+    ref.hp -= dmg;
+  }
+}
+
+/* =========================================================================
+   렌더링
+   ========================================================================= */
+function draw() {
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+
+  // 게임 좌표계로 변환
+  ctx.setTransform(scale,0,0,scale, offX, offY);
+
+  // 흰 배경 (게임 영역)
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,GAME_W,GAME_H);
+
+  // 바닥선
+  ctx.strokeStyle = '#e0e0e0';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0,GROUND_Y+40); ctx.lineTo(GAME_W,GROUND_Y+40); ctx.stroke();
+
+  // 타워 그리기
+  drawTower('player');
+  drawTower('enemy');
+
+  // 유닛 (뒤에 있는 것부터)
+  const sorted = [...state.units].sort((a,b)=>a.y-b.y);
+  for (const u of sorted) drawUnit(u);
+
+  // 발사체
+  for (const p of state.projectiles) {
+    ctx.fillStyle = p.side==='player' ? '#8e44ad' : '#c0392b';
+    ctx.beginPath(); ctx.arc(p.x,p.y,6,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function drawTower(side) {
+  const T = TOWERS[side];
+  const hp = state.towerHp[side], ratio = hp / T.maxHp;
+  const w = 180, h = 440;
+  const x = T.x - w/2, y = GROUND_Y + 40 - h;
+
+  // 건물 본체 (이모지로 대체 — 나중에 이미지 교체 가능)
+  ctx.font = '300px serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText(T.emoji, T.x, GROUND_Y + 40);
+
+  // 이름
+  ctx.fillStyle = '#333'; ctx.font = 'bold 22px sans-serif';
+  ctx.fillText(T.name, T.x, y - 30);
+
+  // 체력바
+  const bw = 160, bh = 14, bx = T.x - bw/2, by = y - 22;
+  ctx.fillStyle = '#ddd'; ctx.fillRect(bx,by,bw,bh);
+  ctx.fillStyle = ratio>.3 ? '#2ecc71' : '#e74c3c';
+  ctx.fillRect(bx,by,bw*ratio,bh);
+  ctx.strokeStyle='#999'; ctx.lineWidth=1; ctx.strokeRect(bx,by,bw,bh);
+}
+
+/* ── 병사 하나 그리기 ──
+   ★ GIF/스프라이트를 쓰려면 이 함수에서 u.state('walk'|'attack')에 따라
+     UNIT_TYPES[u.type].gifWalk / gifAtk 이미지를 drawImage로 그리면 됨.
+     현재는 도형(원 + 방향 표시)으로 렌더링. ── */
+const imgCache = {};
+function getImg(src){
+  if(!src) return null;
+  if(!imgCache[src]){ const i=new Image(); i.src=src; imgCache[src]=i; }
+  return imgCache[src];
+}
+function drawUnit(u) {
+  const t = UNIT_TYPES[u.type];
+  const dir = u.side==='player' ? 1 : -1;
+
+  // 프레임 시퀀스(PNG)가 있으면 그걸 애니메이션, 없으면 도형
+  const frames = u.state==='attack'
+    ? (t.framesAtk || t.framesWalk)
+    : t.framesWalk;
+  const fps = u.state==='attack' ? (t.fpsAtk||10) : (t.fpsWalk||10);
+  let img = null;
+  if (frames && frames.length){
+    const idx = Math.floor(u.anim * fps) % frames.length;
+    img = getImg(frames[idx]);
+  }
+  const size = t.radius * (t.drawScale || 2.6);
+  if (img && img.complete && img.naturalWidth) {
+    // 바라볼 방향: 플레이어 +1(오른쪽), 적 -1(왼쪽).
+    // 그림 기본 방향(faceLeft?-1:+1)과 다르면 좌우 반전
+    const baseDir = t.faceLeft ? -1 : 1;
+    const flip = (dir !== baseDir) ? -1 : 1;
+    ctx.save();
+    ctx.translate(u.x, u.y);
+    ctx.scale(flip, 1);
+    ctx.drawImage(img, -size/2, -size, size, size);
+    ctx.restore();
+  } else {
+    // ── 도형 폴백 ──
+    ctx.save();
+    ctx.translate(u.x, u.y - t.radius);
+    // 그림자
+    ctx.fillStyle='rgba(0,0,0,.12)';
+    ctx.beginPath(); ctx.ellipse(0,t.radius+2,t.radius*.9,6,0,0,Math.PI*2); ctx.fill();
+    // 몸통
+    ctx.fillStyle = u.side==='player' ? t.color : shade(t.color,-30);
+    ctx.beginPath(); ctx.arc(0,0,t.radius,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.lineWidth=2; ctx.stroke();
+    // 아이콘
+    ctx.font = `${t.radius+4}px serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(t.icon, 0, 1);
+    // 진행 방향 표시
+    ctx.fillStyle = u.side==='player'?'#2c3e50':'#c0392b';
+    ctx.beginPath();
+    ctx.moveTo(dir*(t.radius+4), 0);
+    ctx.lineTo(dir*(t.radius-4), -6);
+    ctx.lineTo(dir*(t.radius-4), 6);
+    ctx.fill();
+    ctx.restore();
   }
 
-  // 점프 물리 (중력 적용, 착지 판정)
-  player.vy -= player.gravity * dt;
-  player.y += player.vy * dt;
-  if (player.y <= 0) {
-    player.y = 0; player.vy = 0; player.onGround = true;
+  // 체력바
+  const bw=t.radius*2, bh=5, bx=u.x-bw/2, by=u.y - t.radius*2 - 14;
+  const r = u.hp/u.maxHp;
+  ctx.fillStyle='rgba(0,0,0,.15)'; ctx.fillRect(bx,by,bw,bh);
+  ctx.fillStyle = u.side==='player' ? '#3498db' : '#e74c3c';
+  ctx.fillRect(bx,by,bw*r,bh);
+}
+
+// 색상 밝기 조절 유틸
+function shade(hex, amt){
+  const n=parseInt(hex.slice(1),16);
+  let r=(n>>16)+amt, g=((n>>8)&255)+amt, b=(n&255)+amt;
+  r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+  return '#'+((r<<16)|(g<<8)|b).toString(16).padStart(6,'0');
+}
+
+/* =========================================================================
+   메인 루프 + UI 동기화
+   ========================================================================= */
+function loop(now) {
+  const dt = Math.min(0.05, (now - state.last)/1000);
+  state.last = now;
+  update(dt);
+  draw();
+  syncUI();
+  requestAnimationFrame(loop);
+}
+
+function syncUI() {
+  document.getElementById('money-val').textContent = Math.floor(state.money);
+  document.getElementById('money-bar').style.width =
+    (state.money/state.maxMoney*100)+'%';
+  // 버튼 쿨/비용 상태
+  for (const key in UNIT_TYPES) {
+    const btn = document.getElementById('btn-'+key);
+    if (!btn) continue;
+    const t = UNIT_TYPES[key];
+    const cd = state.cooldowns[key];
+    btn.disabled = state.money < t.cost || cd > 0;
+    const cool = btn.querySelector('.cool');
+    cool.style.height = cd>0 ? (cd/t.cooldown*100)+'%' : '0%';
   }
-
-  // 최종 높이 = 점프 높이 + 걷기 bob
-  hero.position.y = player.y + bob;
 }
 
-function updateCamera() {
-  // 캐릭터 뒤쪽 궤도 카메라. yaw=0에서 카메라는 캐릭터 뒤(+Z)에 서서 -Z(화면 안쪽)를 본다.
-  const tx = hero.position.x, ty = hero.position.y + 3, tz = hero.position.z;
-  const hx = Math.sin(cam.yaw) * Math.cos(cam.pitch);
-  const hy = Math.sin(cam.pitch);
-  const hz = Math.cos(cam.yaw) * Math.cos(cam.pitch);
-  camera.position.set(tx + hx * cam.dist, ty + hy * cam.dist, tz + hz * cam.dist);
-  camera.lookAt(tx, ty, tz);
-}
-
-function onResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-/* =========================================================
-   HUD
-   ========================================================= */
-function updateHUD() {
-  document.getElementById('nameTxt').textContent = player.name;
-  document.getElementById('hpFill').style.width = (player.hp / player.maxHp * 100) + '%';
-  document.getElementById('expFill').style.width = (player.exp / player.maxExp * 100) + '%';
-  document.getElementById('hpTxt').textContent = 'HP ' + player.hp + ' / ' + player.maxHp;
-  document.getElementById('expTxt').textContent = 'EXP ' + player.exp + ' / ' + player.maxExp;
-  document.getElementById('lvBadge').textContent = player.level;
-  document.getElementById('atkTxt').textContent = '공격력 ' + player.atk;
-  document.getElementById('goldTxt').textContent = '골드 ' + player.gold;
-}
-window.gainExp = function(amount) {
-  player.exp += amount;
-  while (player.exp >= player.maxExp) {
-    player.exp -= player.maxExp; player.level++;
-    player.maxHp += 20; player.hp = player.maxHp; player.atk += 3;
-    player.maxExp = Math.floor(player.maxExp * 1.3);
+/* ── 버튼 UI 생성 ── */
+function buildButtons() {
+  const ui = document.getElementById('ui');
+  ui.innerHTML = '';
+  for (const key in UNIT_TYPES) {
+    const t = UNIT_TYPES[key];
+    const b = document.createElement('button');
+    b.className = 'unit-btn'; b.id = 'btn-'+key;
+    // 프레임 이미지가 있으면 첫 프레임을 썸네일로, 없으면 이모지 아이콘
+    const thumb = (t.framesWalk && t.framesWalk[0])
+      ? `<img class="ic-img" src="${t.framesWalk[0]}" alt="${t.name}">`
+      : `<div class="ic">${t.icon}</div>`;
+    b.innerHTML =
+      `${thumb}
+       <div class="nm">${t.name}</div>
+       <div class="cost">💰${t.cost}</div>
+       <div class="cool"></div>`;
+    b.addEventListener('click', ()=>tryProduce(key));
+    ui.appendChild(b);
   }
-  updateHUD();
-};
+}
+
+function endGame(win){
+  state.over = true;
+  document.getElementById('overlay-title').textContent = win ? '승리! 🎉' : '패배…';
+  document.getElementById('overlay-title').style.color = win ? '#2ecc71':'#e74c3c';
+  document.getElementById('overlay-sub').textContent =
+    win ? '에펠탑을 무너뜨렸습니다!' : '남산타워가 파괴되었습니다.';
+  document.getElementById('overlay').style.display='flex';
+}
+function restart(){
+  document.getElementById('overlay').style.display='none';
+  initState();
+}
+
+// ── 시작 ──
+resize();
+buildButtons();
+initState();
+state.last = performance.now();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
