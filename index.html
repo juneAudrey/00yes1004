@@ -277,13 +277,15 @@ let currentAction = null;
 
 /* =========================================================
    3D 모델 설정 — 여기만 바꾸면 캐릭터 교체됨
-   MODEL_URL 에 .glb 파일 경로/URL 을 넣으세요.
-   같은 폴더에 hero.glb 를 두면 './hero.glb' 로 지정.
-   비워두면('') 임시 캐릭터가 나옵니다.
+   모델 파일 위치: index.html 과 같은 곳에 assets/models/ 폴더를 만들고
+   그 안에 01_512.glb 를 넣으세요. (예: 프로젝트폴더/assets/models/01_512.glb)
+   MODEL_URL 을 비우면('') 임시 캐릭터가 나옵니다.
    ========================================================= */
-const MODEL_URL = '';         // 예: './hero.glb'  또는  'https://.../hero.glb'
-const MODEL_SCALE = 1.0;      // 모델 크기 보정
-const MODEL_Y = 0;            // 발이 바닥(y=0)에 오도록 보정
+const MODEL_URL = './assets/models/01_512.glb';   // 주인공 모델 (assets/models 폴더)
+const MODEL_SCALE = 1.0;      // 수동 크기 보정 (AUTO_FIT이 false일 때 사용)
+const MODEL_Y = 0;            // 수동 바닥 보정 (AUTO_FIT이 false일 때 사용)
+const AUTO_FIT = true;        // true면 모델 크기·바닥 위치를 자동으로 맞춤
+const TARGET_HEIGHT = 4.3;    // 목표 캐릭터 키(유닛). 카메라/이름표 기준에 맞춘 값
 // 애니메이션 클립 이름 매핑 (모델마다 다름 — 콘솔 로그 보고 맞추세요)
 const ANIM_NAMES = { idle: ['idle','Idle','Armature|idle','대기'], walk: ['walk','Walk','run','Run','걷기'] };
 
@@ -390,9 +392,31 @@ function loadHero() {
     MODEL_URL,
     (gltf) => {
       const model = gltf.scene;
-      model.scale.setScalar(MODEL_SCALE);
-      model.position.y = MODEL_Y;
       model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+
+      // 1) 수동 스케일 먼저 적용
+      model.scale.setScalar(MODEL_SCALE);
+
+      // 2) 자동 맞춤: 캐릭터 목표 키에 맞춰 크기 보정 + 발을 바닥(y=0)에
+      if (AUTO_FIT) {
+        model.updateWorldMatrix(true, true);
+        let box = new THREE.Box3().setFromObject(model);
+        const height = box.max.y - box.min.y;
+        if (height > 0) {
+          const k = TARGET_HEIGHT / height;
+          model.scale.multiplyScalar(k);
+          model.updateWorldMatrix(true, true);
+          box = new THREE.Box3().setFromObject(model);
+        }
+        // 발끝이 y=0에 오도록, 그리고 좌우/앞뒤 중심을 원점으로
+        const center = box.getCenter(new THREE.Vector3());
+        model.position.x -= center.x;
+        model.position.z -= center.z;
+        model.position.y -= box.min.y;
+      } else {
+        model.position.y = MODEL_Y;
+      }
+
       hero.add(model);
 
       // 애니메이션 준비
@@ -401,12 +425,19 @@ function loadHero() {
         console.log('사용 가능한 애니메이션:', gltf.animations.map(a => a.name));
         gltf.animations.forEach(clip => { actions[clip.name] = mixer.clipAction(clip); });
         playAnim('idle');
+      } else {
+        console.log('이 모델에는 애니메이션이 없습니다. (걷기/대기 없음)');
       }
       // 이름표 다시 부착
       attachLabel(hero);
       document.getElementById('loading').style.display = 'none';
     },
-    undefined,
+    (xhr) => {
+      if (xhr.total) {
+        const pct = Math.round(xhr.loaded / xhr.total * 100);
+        document.getElementById('loading').textContent = '캐릭터 모델 불러오는 중… ' + pct + '%';
+      }
+    },
     (err) => {
       console.warn('모델 로드 실패, 임시 캐릭터 사용:', err);
       hero.add(buildPlaceholder());
