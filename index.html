@@ -116,76 +116,138 @@
   @media (max-width: 480px){
     #stage-name { display: none; }
   }
-  /* ===== 오프닝 화면 ===== */
+  /* ===== 오프닝 화면 (대결 구도) ===== */
   #opening {
     position: fixed; inset: 0; z-index: 30;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; flex-direction: column;
+    overflow: hidden; cursor: pointer;
+    /* 좌 빨강(유튜버) / 우 보라(애니) 대각 분할 */
     background:
-      radial-gradient(120% 90% at 15% 50%, rgba(198,40,40,.55), transparent 55%),
-      radial-gradient(120% 90% at 85% 50%, rgba(0,150,136,.55), transparent 55%),
-      #14141a;
-    overflow: hidden;
-    cursor: pointer;
+      linear-gradient(100deg,
+        #2a0d0d 0%, #4a1212 32%,
+        #1a1024 50%,
+        #2e1147 68%, #1e0a33 100%);
   }
+  /* 좌우 진영 발광 */
   #opening::before {
-    content: ''; position: absolute; inset: 0;
-    background: linear-gradient(105deg,
-      transparent 0 48%, rgba(255,255,255,.10) 49% 51%, transparent 52% 100%);
-    pointer-events: none;
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:
+      radial-gradient(70% 90% at 12% 55%, rgba(229,57,53,.45), transparent 60%),
+      radial-gradient(70% 90% at 88% 55%, rgba(142,68,215,.5), transparent 60%);
   }
-  .op-inner {
-    position: relative; text-align: center; color: #fff;
-    padding: 20px; width: 100%; max-width: 1000px;
-    animation: opIn .6s ease both;
+  /* 가운데 번쩍이는 분할선 */
+  #opening::after {
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background: linear-gradient(100deg,
+      transparent 0 47%,
+      rgba(255,255,255,.85) 49% 50%,
+      rgba(255,255,255,.15) 50.5% 52%,
+      transparent 53% 100%);
+    mix-blend-mode: screen;
+    animation: clash 2.4s ease-in-out infinite;
   }
-  @keyframes opIn { from{opacity:0; transform:translateY(18px);} to{opacity:1;transform:none;} }
-  .op-vs-row {
+  @keyframes clash { 0%,100%{opacity:.35} 50%{opacity:.85} }
+
+  /* 대결 스테이지: 좌 캐릭터 | VS | 우 캐릭터 */
+  .op-stage {
+    position: relative; z-index: 2;
+    flex: 1 1 auto; min-height: 0;
     display: flex; align-items: center; justify-content: center;
-    gap: clamp(20px, 6vw, 80px); margin-bottom: 26px;
+    gap: clamp(4px, 1.5vw, 24px);
+    padding: clamp(10px,2vw,24px) clamp(8px,2vw,20px) 0;
   }
-  .op-side { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .op-face {
-    font-size: clamp(56px, 11vw, 104px); line-height: 1;
-    filter: drop-shadow(0 6px 14px rgba(0,0,0,.5));
-    animation: bob 2.2s ease-in-out infinite;
+  .op-fighter {
+    position: relative;
+    display: flex; flex-direction: column;
+    flex: 1 1 0; min-width: 0; height: 100%;
+    justify-content: flex-end;
   }
-  .op-side.player .op-face { animation-delay: .4s; }
-  @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-  .op-team { font-size: clamp(15px,2.4vw,22px); font-weight: 800; }
-  .op-role {
-    font-size: 12px; font-weight: 700; letter-spacing: .05em;
-    padding: 3px 10px; border-radius: 20px;
+  .op-fighter.left  { align-items: flex-start; }   /* 왼쪽 캐릭터는 왼쪽으로 */
+  .op-fighter.right { align-items: flex-end; }      /* 오른쪽 캐릭터는 오른쪽으로 */
+  .op-char {
+    max-height: 68vh; max-width: 92%;
+    width: auto; object-fit: contain;
+    filter: drop-shadow(0 12px 24px rgba(0,0,0,.6));
+    animation: fIn .6s ease both, bob 2.6s ease-in-out infinite 0.6s;
   }
-  .op-side.cpu .op-role    { background:#c62828; }
-  .op-side.player .op-role { background:#00897b; }
+  /* 왼쪽 캐릭터는 오른쪽(가운데)을 향하도록, 오른쪽은 왼쪽을 향하도록 */
+  .op-fighter.left  .op-char { transform: scaleX(1); }
+  .op-fighter.right .op-char { transform: scaleX(1); }
+  .op-fighter.left  { animation: slideL .6s ease both; }
+  .op-fighter.right { animation: slideR .6s ease both; }
+  @keyframes slideL { from{opacity:0; transform:translateX(-40px)} to{opacity:1;transform:none} }
+  @keyframes slideR { from{opacity:0; transform:translateX(40px)}  to{opacity:1;transform:none} }
+  @keyframes fIn { from{opacity:0} to{opacity:1} }
+  @keyframes bob { 0%,100%{translate:0 0} 50%{translate:0 -12px} }
+
+  .op-badge {
+    position: absolute; top: clamp(2px,1vh,10px);
+    left: 50%; transform: translateX(-50%);
+    font-size: clamp(10px,1.9vw,15px); font-weight: 800; color:#fff;
+    padding: 5px 12px; border-radius: 20px; white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4); z-index: 3;
+  }
+  .op-badge.yt { background:#e53935; }
+  .op-badge.an { background:#8e44d7; }
+  .op-side-label {
+    position: absolute; bottom: clamp(2px,1vh,8px);
+    left: 50%; transform: translateX(-50%);
+    font-size: clamp(11px,2vw,16px); font-weight: 800; color:#fff;
+    padding: 3px 12px; border-radius: 16px; background: rgba(0,0,0,.5);
+    white-space: nowrap;
+  }
+  .op-side-label.yt { color:#ff8a80; }
+  .op-side-label.an { color:#ce93ff; }
+
+  .op-center { flex: 0 0 auto; z-index: 4; }
   .op-vs {
-    font-size: clamp(34px, 7vw, 64px); font-weight: 900; font-style: italic;
-    color: #ffd54a; text-shadow: 0 3px 0 #a67c00, 0 0 24px rgba(255,213,74,.5);
-    transform: rotate(-6deg);
+    font-size: clamp(40px, 9vw, 92px); font-weight: 900; font-style: italic;
+    color:#ffd54a;
+    text-shadow: 0 0 12px rgba(255,213,74,.8), 0 4px 0 #a67c00, 0 6px 20px rgba(0,0,0,.6);
+    transform: rotate(-8deg);
+    animation: vsPulse 1.4s ease-in-out infinite;
+  }
+  @keyframes vsPulse { 0%,100%{transform:rotate(-8deg) scale(1)} 50%{transform:rotate(-8deg) scale(1.12)} }
+
+  /* 하단 제목/시작 */
+  .op-bottom {
+    position: relative; z-index: 3;
+    flex: 0 0 auto; text-align: center; color:#fff;
+    padding: clamp(6px,1.5vh,16px) 16px clamp(14px,3vh,30px);
   }
   .op-title {
-    font-size: clamp(34px, 8vw, 78px); font-weight: 900; line-height: 1.05;
-    letter-spacing: -.01em;
-    text-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 30px rgba(0,0,0,.4);
-    margin-bottom: 8px;
+    font-size: clamp(30px, 7vw, 68px); font-weight: 900; line-height: 1.04;
+    text-shadow: 0 4px 0 rgba(0,0,0,.4), 0 0 30px rgba(0,0,0,.5);
   }
   .op-title .op-title-sub {
-    display: block; font-size: clamp(14px, 2.6vw, 22px); font-weight: 800;
-    color: #ffd54a; letter-spacing: .18em; margin-bottom: 6px; text-shadow: none;
+    display:block; font-size: clamp(12px,2.4vw,20px); font-weight:800;
+    color:#ffd54a; letter-spacing:.12em; margin-bottom:6px; text-shadow:none;
   }
   .op-title em {
     font-style: normal;
-    background: linear-gradient(90deg,#ff5252,#ffd54a,#4dd0e1);
+    background: linear-gradient(90deg,#ff5252,#ffd54a,#ce93ff);
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
   .op-start {
-    margin-top: 28px; font-size: clamp(15px,2.6vw,20px); font-weight: 700;
+    margin-top: clamp(8px,1.5vh,18px); font-size: clamp(14px,2.6vw,19px); font-weight:700;
     animation: blink 1.2s steps(2,start) infinite;
   }
-  @keyframes blink { 50% { opacity: .25; } }
-  .op-hint { margin-top: 12px; font-size: 13px; color: #c9c9d4; font-weight: 600; }
+  @keyframes blink { 50% { opacity:.25; } }
   @media (prefers-reduced-motion: reduce){
-    .op-inner,.op-face,.op-start{animation:none!important}
+    .op-char,.op-fighter,.op-vs,.op-start,#opening::after{animation:none!important}
+  }
+  /* 세로 화면(모바일/태블릿 portrait): 캐릭터 축소 + 간격 확보로 겹침 방지 */
+  @media (max-aspect-ratio: 1/1){
+    .op-char { max-height: 42vh; max-width: 96%; }
+    .op-stage { gap: clamp(2px,1vw,10px); align-items: center; }
+    .op-fighter { justify-content: center; }
+    .op-vs { font-size: clamp(30px,8vw,56px); }
+  }
+  /* 아주 좁은 세로 모바일: 더 축소 */
+  @media (max-aspect-ratio: 1/1) and (max-width: 480px){
+    .op-char { max-height: 36vh; }
+    .op-badge { font-size: 10px; padding: 4px 8px; }
+    .op-side-label { font-size: 11px; }
   }
 
   /* 결과 오버레이 */
@@ -223,28 +285,35 @@
 
     <!-- ===== 오프닝 화면 ===== -->
     <div id="opening">
-      <div class="op-inner">
-        <div class="op-vs-row">
-          <div class="op-side cpu">
-            <div class="op-face">📺</div>
-            <div class="op-team">유튜버 군단</div>
-            <div class="op-role">CPU · 왼쪽</div>
-          </div>
-          <div class="op-vs">VS</div>
-          <div class="op-side player">
-            <div class="op-face">🐷</div>
-            <div class="op-team">애니 캐릭터</div>
-            <div class="op-role">PLAYER · 오른쪽</div>
-          </div>
+      <!-- 진영 대결 스테이지 -->
+      <div class="op-stage">
+        <!-- 왼쪽: 유튜버 진영 -->
+        <div class="op-fighter left">
+          <div class="op-badge yt">유튜버 진영 · CPU</div>
+          <img class="op-char" src="assets/opening/youtuber.png" alt="유튜버">
+          <div class="op-side-label yt">◀ 왼쪽</div>
         </div>
 
+        <!-- 가운데 VS -->
+        <div class="op-center">
+          <div class="op-vs">VS</div>
+        </div>
+
+        <!-- 오른쪽: 애니 진영 -->
+        <div class="op-fighter right">
+          <div class="op-badge an">애니 진영 · PLAYER(당신)</div>
+          <img class="op-char" src="assets/opening/anime.png" alt="애니">
+          <div class="op-side-label an">오른쪽 ▶</div>
+        </div>
+      </div>
+
+      <!-- 제목 + 시작 안내 -->
+      <div class="op-bottom">
         <h1 class="op-title">
-          <span class="op-title-sub">유튜버 vs 애니메이션</span>
+          <span class="op-title-sub">유튜버 &nbsp;VS&nbsp; 애니메이션</span>
           채운이의 <em>대전쟁</em>
         </h1>
-
         <div class="op-start">아무 키를 누르거나 화면을 터치하세요</div>
-        <div class="op-hint">◀ CPU (왼쪽) &nbsp;&nbsp;|&nbsp;&nbsp; 당신은 오른쪽 진영입니다 (PLAYER) ▶</div>
       </div>
     </div>
 
@@ -335,40 +404,55 @@ function frameList(char, action, count){
 }
 
 const UNIT_TYPES = {
-  // ── 포치타: 근접 공격 캐릭터 (스프라이트 GIF 사용) ──
+  // ── 포치타: 근접. 모든 스탯 "보통"의 기준점 ──
   // 원본 그림이 왼쪽을 보고 있어 faceLeft:true → 플레이어(오른쪽 전진)일 때 좌우반전
   pochita: {
     name: '포치타', icon: '🐷', color: '#e74c3c',
     hp: 140, dmg: 20, atkSpeed: 0.55, range: 62, speed: 80,
     cost: 45, cooldown: 2.0, radius: 30,
-    // GIF는 미리보기/외부용. 게임 안에서는 아래 프레임 PNG를 직접 애니메이션한다
-    // (canvas의 drawImage는 GIF 첫 프레임만 그리기 때문)
     gifWalk: 'assets/characters/pochita/pochita_run.gif',
     gifAtk:  'assets/characters/pochita/pochita_attack.gif',
     framesWalk: frameList('pochita','run',6),
     framesAtk:  frameList('pochita','attack',6),
     fpsWalk: 11, fpsAtk: 12,
-    faceLeft: true,   // 그림 기본 방향이 왼쪽
-    drawScale: 2.6,   // 도형 대비 이미지 크기 배율
+    faceLeft: true,
+    drawScale: 2.6,
   },
-  melee: {
-    name: '보병', icon: '🗡️', color: '#3a7bd5',
-    hp: 120, dmg: 18, atkSpeed: 0.6, range: 60, speed: 70,
-    cost: 40, cooldown: 2.2, radius: 26,
-    gifWalk: null,   // 예: 'assets/soldier_walk.gif'
-    gifAtk:  null,   // 예: 'assets/soldier_atk.gif'
+
+  // ── 레제: 원거리. 폭탄을 던져 착탄 지점에 범위 피해 ──
+  // 이동=걷기, 공격=던지기. 속도 0.7배(느림), 공격력·체력 포치타와 동일
+  reze: {
+    name: '레제', icon: '🎀', color: '#34495e',
+    hp: 140,            // 포치타 ×1.0
+    dmg: 20,            // 포치타 ×1.0
+    atkSpeed: 1.1, range: 240, speed: 56,   // speed = 80 ×0.7
+    cost: 70, cooldown: 3.6, radius: 28,
+    projectile: 'bomb',              // 폭탄 발사체
+    splashRadius: 112,               // 캐릭터 크기(radius*2≈56)의 약 2배 = 112
+    gifWalk: 'assets/characters/reze/reze_run.gif',
+    gifAtk:  'assets/characters/reze/reze_attack.gif',
+    framesWalk: frameList('reze','run',6),
+    framesAtk:  frameList('reze','attack',6),
+    fpsWalk: 10, fpsAtk: 11,
+    faceLeft: true,
+    drawScale: 2.7,
   },
-  ranged: {
-    name: '궁수', icon: '🏹', color: '#8e44ad',
-    hp: 70, dmg: 12, atkSpeed: 0.9, range: 200, speed: 60,
-    cost: 70, cooldown: 4.0, radius: 22,
-    gifWalk: null, gifAtk: null,
-  },
-  tank: {
-    name: '방패병', icon: '🛡️', color: '#2c9c6a',
-    hp: 320, dmg: 10, atkSpeed: 0.7, range: 55, speed: 45,
-    cost: 90, cooldown: 6.0, radius: 32,
-    gifWalk: null, gifAtk: null,
+
+  // ── 유기사: 근접. 빠르고 튼튼하지만 공격력 낮음 ──
+  // 이동=공격(돌진) 모션, 공격=공격(베기) 모션
+  yugisa: {
+    name: '유기사', icon: '🪽', color: '#7f8c8d',
+    hp: 182,            // 포치타 ×1.3
+    dmg: 14,            // 포치타 ×0.7
+    atkSpeed: 0.6, range: 64, speed: 104,   // speed = 80 ×1.3
+    cost: 60, cooldown: 2.6, radius: 32,
+    gifWalk: 'assets/characters/yugisa/yugisa_run.gif',
+    gifAtk:  'assets/characters/yugisa/yugisa_attack.gif',
+    framesWalk: frameList('yugisa','run',6),
+    framesAtk:  frameList('yugisa','attack',6),
+    fpsWalk: 12, fpsAtk: 11,
+    faceLeft: true,
+    drawScale: 2.7,
   },
 };
 
@@ -387,6 +471,7 @@ function initState() {
     moneyRate: 22,           // 초당 돈 회복
     units: [],               // 전장 위 모든 병사
     projectiles: [],         // 원거리 발사체
+    explosions: [],          // 폭발 이펙트(레제 폭탄)
     towerHp: { player: TOWERS.player.maxHp, enemy: TOWERS.enemy.maxHp },
     cooldowns: { melee:0, ranged:0, tank:0 },
     enemyTimer: 0,           // 적 AI 스폰 타이머
@@ -435,7 +520,7 @@ function update(dt) {
   // 적 AI: 주기적으로 랜덤 병사 스폰 (난이도 = 스폰 간격)
   state.enemyTimer -= dt;
   if (state.enemyTimer <= 0) {
-    const pool = ['melee','melee','ranged','tank'];
+    const pool = ['pochita','pochita','reze','yugisa'];
     spawnUnit(pool[Math.floor(Math.random()*pool.length)], 'enemy');
     state.enemyTimer = 2.4 + Math.random()*1.6;
   }
@@ -458,9 +543,17 @@ function update(dt) {
         u.atkTimer = t.atkSpeed;
         if (t.range > 120) {
           // 원거리: 발사체 생성
+          const isBomb = t.projectile === 'bomb';
+          const startX = u.x, startY = u.y - 34;
+          const tgtX = targetX(target.ref);
           state.projectiles.push({
-            x: u.x, y: u.y - 20,
-            tx: target.ref, side: u.side, dmg: t.dmg, speed: 520,
+            x: startX, y: startY,
+            x0: startX, y0: startY,          // 시작점(포물선 계산용)
+            tx: target.ref, side: u.side, dmg: t.dmg,
+            speed: isBomb ? 420 : 520,
+            kind: isBomb ? 'bomb' : 'arrow',
+            splash: isBomb ? (t.splashRadius||0) : 0,
+            spin: 0,
           });
         } else {
           // 근접: 즉시 데미지
@@ -482,13 +575,41 @@ function update(dt) {
     const dx = tgtX - p.x, dy = tgtY - p.y;
     const dist = Math.hypot(dx, dy);
     const step = p.speed * dt;
+    p.spin += dt * 12;
     if (dist <= step || isDead(p.tx)) {
-      if (!isDead(p.tx)) dealDamage(p.tx, p.dmg);
+      // 착탄 지점
+      const hitX = (dist<=step)? tgtX : p.x;
+      const hitY = GROUND_Y;
+      if (p.splash > 0) {
+        // ── 범위 공격: 착탄점 주변 적 유닛 모두 피해 ──
+        for (const e of state.units) {
+          if (e.side === p.side || e.hp <= 0) continue;
+          if (Math.abs(e.x - hitX) <= p.splash) dealDamage(e, p.dmg);
+        }
+        // 적 타워도 범위 안이면 피해
+        const enemySide = p.side==='player' ? 'enemy' : 'player';
+        if (Math.abs(TOWERS[enemySide].x - hitX) <= p.splash)
+          dealDamage('tower:'+enemySide, p.dmg);
+        // 폭발 이펙트
+        state.explosions.push({ x: hitX, y: hitY-20, r: 0, max: p.splash, t: 0 });
+      } else {
+        if (!isDead(p.tx)) dealDamage(p.tx, p.dmg);
+      }
       p.dead = true;
     } else {
       p.x += dx/dist*step; p.y += dy/dist*step;
+      // 폭탄은 포물선(살짝 떠서 감)
+      if (p.kind==='bomb'){
+        const total = Math.hypot(tgtX-p.x0, tgtY-p.y0) || 1;
+        const prog = 1 - dist/total;                 // 0→1 진행도
+        p.arc = Math.sin(prog*Math.PI) * 60;         // 최대 60px 상승
+      }
     }
   }
+
+  // 폭발 이펙트 진행
+  for (const ex of state.explosions){ ex.t += dt; ex.r = ex.max * Math.min(1, ex.t/0.25); }
+  state.explosions = state.explosions.filter(ex => ex.t < 0.4);
 
   // 죽은 것 정리
   state.units = state.units.filter(u => u.hp > 0);
@@ -549,14 +670,39 @@ function draw() {
   // 게임 좌표계로 변환 (DPR 포함): 화면px = (게임좌표 × scale + off) × dpr
   ctx.setTransform(scale*dpr, 0, 0, scale*dpr, offX*dpr, offY*dpr);
 
-  // 흰 배경 (게임 영역)
-  ctx.fillStyle = '#ffffff';
+  // 배경: 좌(유튜버·빨강) → 우(애니·보라) 은은한 진영 그라데이션
+  const bg = ctx.createLinearGradient(0,0,GAME_W,0);
+  bg.addColorStop(0.00, '#fdeaea');   // 왼쪽 옅은 빨강
+  bg.addColorStop(0.40, '#fbf3f4');
+  bg.addColorStop(0.50, '#f7f4fb');
+  bg.addColorStop(0.60, '#f6f1fb');
+  bg.addColorStop(1.00, '#efe6fb');   // 오른쪽 옅은 보라
+  ctx.fillStyle = bg;
   ctx.fillRect(0,0,GAME_W,GAME_H);
 
+  // 하늘빛 상단 광 (양 진영 색)
+  const glowL = ctx.createRadialGradient(GAME_W*0.12,120,0, GAME_W*0.12,120, 420);
+  glowL.addColorStop(0,'rgba(229,57,53,.10)'); glowL.addColorStop(1,'transparent');
+  ctx.fillStyle=glowL; ctx.fillRect(0,0,GAME_W,GAME_H);
+  const glowR = ctx.createRadialGradient(GAME_W*0.88,120,0, GAME_W*0.88,120, 420);
+  glowR.addColorStop(0,'rgba(142,68,215,.12)'); glowR.addColorStop(1,'transparent');
+  ctx.fillStyle=glowR; ctx.fillRect(0,0,GAME_W,GAME_H);
+
+  // 바닥: 진영별로 살짝 다른 색 띠
+  const groundY = GROUND_Y+40;
+  const gg = ctx.createLinearGradient(0,0,GAME_W,0);
+  gg.addColorStop(0,'#f3d9d9'); gg.addColorStop(0.5,'#ede8f0'); gg.addColorStop(1,'#e2d3f2');
+  ctx.fillStyle = gg;
+  ctx.fillRect(0, groundY, GAME_W, GAME_H-groundY);
+
+  // 중앙 대치선 (연한 세로 광)
+  ctx.fillStyle = 'rgba(120,120,140,.06)';
+  ctx.fillRect(GAME_W/2-2, 0, 4, groundY);
+
   // 바닥선
-  ctx.strokeStyle = '#e0e0e0';
+  ctx.strokeStyle = 'rgba(0,0,0,.12)';
   ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0,GROUND_Y+40); ctx.lineTo(GAME_W,GROUND_Y+40); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,groundY); ctx.lineTo(GAME_W,groundY); ctx.stroke();
 
   // 타워 그리기
   drawTower('player');
@@ -568,8 +714,37 @@ function draw() {
 
   // 발사체
   for (const p of state.projectiles) {
-    ctx.fillStyle = p.side==='player' ? '#8e44ad' : '#c0392b';
-    ctx.beginPath(); ctx.arc(p.x,p.y,6,0,Math.PI*2); ctx.fill();
+    const py = p.y - (p.arc||0);   // 포물선 상승 반영
+    if (p.kind === 'bomb') {
+      // 폭탄: 검은 원 + 심지 + 반짝임
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath(); ctx.arc(p.x, py, 11, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#8a6d3b'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p.x+7, py-8);
+      ctx.quadraticCurveTo(p.x+14, py-16, p.x+10, py-20); ctx.stroke();
+      ctx.fillStyle = '#ffcc00';
+      ctx.beginPath(); ctx.arc(p.x+10, py-21, 2.5, 0, Math.PI*2); ctx.fill();
+      // 하이라이트
+      ctx.fillStyle = 'rgba(255,255,255,.35)';
+      ctx.beginPath(); ctx.arc(p.x-3, py-3, 3, 0, Math.PI*2); ctx.fill();
+    } else {
+      ctx.fillStyle = p.side==='player' ? '#8e44ad' : '#c0392b';
+      ctx.beginPath(); ctx.arc(p.x, py, 6, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  // 폭발 이펙트 (레제 범위 공격)
+  for (const ex of state.explosions){
+    const a = 1 - ex.t/0.4;                 // 점점 투명
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, a);
+    // 바깥 링
+    ctx.strokeStyle = '#ff7043'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(ex.x, ex.y, ex.r, 0, Math.PI*2); ctx.stroke();
+    // 안쪽 채움
+    ctx.fillStyle = 'rgba(255,160,0,.30)';
+    ctx.beginPath(); ctx.arc(ex.x, ex.y, ex.r*0.75, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
   }
 }
 
