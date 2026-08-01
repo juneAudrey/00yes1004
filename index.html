@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>My RPG 3D - Prototype</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #1a1d24; overflow: hidden;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #c { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: grab; }
+  #c:active { cursor: grabbing; }
+
+  #hud { position: fixed; top: 12px; left: 12px; display: flex; align-items: center; gap: 10px; pointer-events: none; }
+  #portrait {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #3a4364; border: 3px solid #c8a84b;
+    display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0;
+  }
+  #portrait .lv {
+    position: absolute; bottom: -4px; right: -4px;
+    background: #101216; color: #e6cd7e; border: 2px solid #c8a84b; border-radius: 50%;
+    width: 24px; height: 24px; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #bars { display: flex; flex-direction: column; gap: 5px; }
+  .bar { width: 220px; height: 20px; border-radius: 10px; background: rgba(0,0,0,0.55); overflow: hidden; position: relative; border: 1px solid rgba(255,255,255,0.12); }
+  .bar .fill { height: 100%; width: 100%; transition: width 0.2s; }
+  .bar.hp .fill { background: linear-gradient(#e5584f,#b5352d); }
+  .bar.exp .fill { background: linear-gradient(#59b36b,#2e8b4a); }
+  .bar .txt { position: absolute; inset: 0; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; padding-left: 10px; text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
+  #stats { position: fixed; top: 78px; left: 12px; display: flex; gap: 12px; color: #d8d3c4; font-size: 13px; font-weight: 600; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
+  #hint { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); color: #aeb4c2; font-size: 13px; background: rgba(0,0,0,0.4); padding: 6px 14px; border-radius: 8px; pointer-events: none; }
+  #version { position: fixed; bottom: 10px; right: 14px; color: #8b90a0; font-size: 12px; pointer-events: none; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #aeb4c2; font-size: 15px; background: #1a1d24; }
+  #lockIcon {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    display: none; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 5;
+  }
+  #lockIcon .ring {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.85);
+    box-shadow: 0 0 6px rgba(0,0,0,0.6);
+    position: relative;
+  }
+  #lockIcon .ring::after {
+    content: ''; position: absolute; top: 50%; left: 50%;
+    width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,0.9);
+    transform: translate(-50%, -50%);
+  }
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div id="portrait"><span style="font-size:24px">🙂</span><div class="lv" id="lvBadge">1</div></div>
+    <div id="bars">
+      <div class="bar hp"><div class="fill" id="hpFill"></div><div class="txt" id="hpTxt">HP</div></div>
+      <div class="bar exp"><div class="fill" id="expFill"></div><div class="txt" id="expTxt">EXP</div></div>
+    </div>
+  </div>
+  <div id="stats"><span id="atkTxt">공격력 10</span><span id="goldTxt">골드 0</span></div>
+  <div id="hint">이동: WASD / 방향키 · 시점: 마우스 드래그 · 줌: 휠 · Shift: 시점 고정</div>
+  <div id="lockIcon"><div class="ring"></div></div>
+  <div id="version">PROTO 3D 0.1</div>
+  <div id="loading">3D 엔진 불러오는 중…</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* =========================================================
+   전역 상태 — 나중에 몹/스킬/아이템은 여기에 추가
+   ========================================================= */
+const player = {
+  hp: 100, maxHp: 100, exp: 0, maxExp: 100,
+  level: 1, atk: 10, gold: 0,
+  speed: 6, moving: false, animTime: 0,
+};
+const keys = {};
+
+// 카메라 궤도 파라미터
+const cam = { yaw: 0, pitch: 0.9, dist: 12, minDist: 6, maxDist: 22, shiftLock: false };
+
+let renderer, scene, camera, hero, clock;
+let heroParts = {};
+
+init();
+
+function init() {
+  const canvas = document.getElementById('c');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x2b2f3a);
+  scene.fog = new THREE.Fog(0x2b2f3a, 40, 90);
+
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
+
+  buildLights();
+  buildGround();
+  hero = buildHero();
+  scene.add(hero);
+
+  clock = new THREE.Clock();
+  bindInput(canvas);
+  window.addEventListener('resize', onResize);
+
+  document.getElementById('loading').style.display = 'none';
+  updateHUD();
+  renderer.setAnimationLoop(loop);
+}
+
+/* ---- 조명 ---- */
+function buildLights() {
+  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+  sun.position.set(15, 25, 10);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  const s = 30;
+  sun.shadow.camera.left = -s; sun.shadow.camera.right = s;
+  sun.shadow.camera.top = s; sun.shadow.camera.bottom = -s;
+  scene.add(sun);
+}
+
+/* ---- 바닥: 체커보드 타일 ---- */
+function buildGround() {
+  const size = 120, tiles = 30, step = size / tiles;
+  const group = new THREE.Group();
+  const geo = new THREE.PlaneGeometry(step, step);
+  const matA = new THREE.MeshStandardMaterial({ color: 0x6b7080 });
+  const matB = new THREE.MeshStandardMaterial({ color: 0x61667a });
+  for (let x = 0; x < tiles; x++) {
+    for (let z = 0; z < tiles; z++) {
+      const m = new THREE.Mesh(geo, (x + z) % 2 ? matA : matB);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set((x - tiles/2) * step + step/2, 0, (z - tiles/2) * step + step/2);
+      m.receiveShadow = true;
+      group.add(m);
+    }
+  }
+  scene.add(group);
+}
+
+/* ---- 캐릭터: 블록형 (검은 후드 재킷, 검은 바지·신발, 흰 머리, 파란 눈) ---- */
+function buildHero() {
+  const g = new THREE.Group();
+  const box = (w, h, d, color) => new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color })
+  );
+  const add = (mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.castShadow = true; g.add(mesh); return mesh; };
+
+  // 색상 팔레트
+  const C = {
+    jacket: 0x1a1c26,   // 검은 후드 재킷
+    jacketShade: 0x141620,
+    pants: 0x171922,    // 검은 바지
+    pantsShade: 0x121319,
+    shoe: 0x0d0e13,     // 검은 신발
+    skin: 0xf0cbab,
+    skinShade: 0xe4b995,
+    hair: 0xe8ecf2,     // 흰~은색 머리
+    hairShade: 0xc9d2e0,
+    eye: 0x3f9fe0,      // 파란 눈
+  };
+
+  // 다리 (검은 바지)
+  heroParts.legL = add(box(0.5, 1.5, 0.5, C.pants), -0.32, 0.75, 0);
+  heroParts.legR = add(box(0.5, 1.5, 0.5, C.pantsShade), 0.32, 0.75, 0);
+  // 신발
+  add(box(0.56, 0.28, 0.75, C.shoe), -0.32, 0.14, 0.1);
+  add(box(0.56, 0.28, 0.75, C.shoe),  0.32, 0.14, 0.1);
+
+  // 몸통 (후드 재킷, 지퍼 라인)
+  add(box(1.35, 1.6, 0.72, C.jacket), 0, 2.2, 0);
+  add(box(0.06, 1.4, 0.05, C.jacketShade), 0, 2.2, 0.37); // 지퍼 중앙선
+  // 하이넥 칼라 (세워진 후드 깃)
+  add(box(1.1, 0.5, 0.7, C.jacket), 0, 3.15, 0);
+  add(box(0.9, 0.3, 0.5, 0x0e0f16), 0, 3.05, -0.12); // 후드 안쪽 그림자
+
+  // 팔 (손을 앞쪽/주머니 쪽으로)
+  heroParts.armL = add(box(0.42, 1.5, 0.42, C.jacket), -0.9, 2.15, 0.05);
+  heroParts.armR = add(box(0.42, 1.5, 0.42, C.jacketShade), 0.9, 2.15, 0.05);
+
+  // 목
+  add(box(0.4, 0.25, 0.4, C.skin), 0, 3.28, 0);
+
+  // 머리
+  add(box(1.1, 1.0, 1.0, C.skin), 0, 3.95, 0);
+  // 흰 머리카락 (삐죽한 느낌: 윗단 + 앞머리 뭉치)
+  add(box(1.18, 0.4, 1.08, C.hair), 0, 4.42, 0);
+  add(box(1.18, 0.55, 0.2, C.hair), 0, 4.05, -0.47);   // 뒷머리
+  add(box(0.3, 0.3, 0.15, C.hairShade), -0.35, 4.15, 0.5); // 앞머리 뭉치
+  add(box(0.3, 0.3, 0.15, C.hairShade),  0.1, 4.2, 0.5);
+  add(box(0.25, 0.25, 0.15, C.hairShade), 0.45, 4.1, 0.48);
+  // 파란 눈
+  add(box(0.22, 0.16, 0.05, C.eye), -0.26, 3.98, 0.52);
+  add(box(0.22, 0.16, 0.05, C.eye),  0.26, 3.98, 0.52);
+  // 눈썹/그림자 (강렬한 눈빛 느낌)
+  add(box(0.24, 0.05, 0.04, C.hairShade), -0.26, 4.12, 0.53);
+  add(box(0.24, 0.05, 0.04, C.hairShade),  0.26, 4.12, 0.53);
+
+  g.position.set(0, 0, 0);
+  g.userData.facing = 0; // 바라보는 방향(rad)
+
+  // 이름표 (스프라이트)
+  const label = makeLabel('Lv.' + player.level + ' 주인공');
+  label.position.set(0, 5.4, 0);
+  g.add(label);
+  heroParts.label = label;
+
+  return g;
+}
+
+function makeLabel(text) {
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 64;
+  const c = cv.getContext('2d');
+  c.fillStyle = 'rgba(0,0,0,0.5)';
+  c.fillRect(0, 16, 256, 32);
+  c.fillStyle = '#fff'; c.font = 'bold 22px sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(text, 128, 34);
+  const tex = new THREE.CanvasTexture(cv);
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  spr.scale.set(4, 1, 1);
+  return spr;
+}
+
+/* =========================================================
+   입력
+   ========================================================= */
+function bindInput(canvas) {
+  window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+  window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+  let dragging = false, lx = 0, ly = 0;
+  const start = (x, y) => { dragging = true; lx = x; ly = y; };
+  const move = (x, y) => {
+    // 시프트락이면 드래그 없이도 회전, 아니면 드래그 중에만
+    if (!dragging && !cam.shiftLock) { lx = x; ly = y; return; }
+    cam.yaw -= (x - lx) * 0.005;
+    // 위아래 반전: 마우스를 위로 올리면 시점도 위로
+    cam.pitch = Math.max(0.25, Math.min(1.4, cam.pitch + (y - ly) * 0.005));
+    lx = x; ly = y;
+  };
+  const end = () => dragging = false;
+
+  canvas.addEventListener('mousedown', e => start(e.clientX, e.clientY));
+  window.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('wheel', e => {
+    cam.dist = Math.max(cam.minDist, Math.min(cam.maxDist, cam.dist + e.deltaY * 0.01));
+    e.preventDefault();
+  }, { passive: false });
+
+  // 우클릭 컨텍스트 메뉴 차단
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  // Shift 락 토글 (로블록스 시프트락): 켜지면 캐릭터가 카메라 정면을 바라봄
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Shift' && !e.repeat) {
+      cam.shiftLock = !cam.shiftLock;
+      document.getElementById('lockIcon').style.display = cam.shiftLock ? 'flex' : 'none';
+    }
+  });
+
+  // 터치(태블릿/모바일 대비 기본 시점 회전)
+  canvas.addEventListener('touchstart', e => { const t = e.touches[0]; start(t.clientX, t.clientY); });
+  canvas.addEventListener('touchmove', e => { const t = e.touches[0]; move(t.clientX, t.clientY); e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('touchend', end);
+}
+
+/* =========================================================
+   메인 루프
+   ========================================================= */
+function loop() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  updatePlayer(dt);
+  updateCamera();
+  renderer.render(scene, camera);
+}
+
+function updatePlayer(dt) {
+  // 카메라 기준 이동 방향 계산
+  let ix = 0, iz = 0;
+  if (keys['w'] || keys['arrowup']) iz -= 1;
+  if (keys['s'] || keys['arrowdown']) iz += 1;
+  if (keys['a'] || keys['arrowleft']) ix -= 1;
+  if (keys['d'] || keys['arrowright']) ix += 1;
+
+  player.moving = (ix !== 0 || iz !== 0);
+
+  // 시프트락: 캐릭터가 항상 카메라 정면을 바라봄 (이동 여부와 무관)
+  if (cam.shiftLock) {
+    let cur = hero.rotation.y;
+    let diff = ((cam.yaw - cur + Math.PI) % (Math.PI * 2)) - Math.PI;
+    hero.rotation.y = cur + diff * Math.min(1, dt * 16);
+  }
+
+  if (player.moving) {
+    const len = Math.hypot(ix, iz); ix /= len; iz /= len;
+    // 카메라 yaw 기준으로 이동 방향 회전
+    const sin = Math.sin(cam.yaw), cos = Math.cos(cam.yaw);
+    const wx = ix * cos - iz * sin;
+    const wz = ix * sin + iz * cos;
+    hero.position.x += wx * player.speed * dt;
+    hero.position.z += wz * player.speed * dt;
+
+    // 시프트락이 아니면 진행 방향으로 몸 회전
+    if (!cam.shiftLock) {
+      const target = Math.atan2(wx, wz);
+      let cur = hero.rotation.y;
+      let diff = ((target - cur + Math.PI) % (Math.PI * 2)) - Math.PI;
+      hero.rotation.y = cur + diff * Math.min(1, dt * 12);
+    }
+
+    player.animTime += dt;
+    // 걷기: 팔다리 스윙
+    const sw = Math.sin(player.animTime * 10) * 0.5;
+    heroParts.legL.rotation.x = sw;
+    heroParts.legR.rotation.x = -sw;
+    heroParts.armL.rotation.x = -sw;
+    heroParts.armR.rotation.x = sw;
+    hero.position.y = Math.abs(Math.sin(player.animTime * 10)) * 0.12;
+  } else {
+    heroParts.legL.rotation.x = heroParts.legR.rotation.x = 0;
+    heroParts.armL.rotation.x = heroParts.armR.rotation.x = 0;
+    hero.position.y = 0;
+  }
+}
+
+function updateCamera() {
+  // 캐릭터 뒤쪽 궤도 카메라. yaw=0에서 카메라는 캐릭터 뒤(+Z)에 서서 -Z(화면 안쪽)를 본다.
+  const tx = hero.position.x, ty = hero.position.y + 3, tz = hero.position.z;
+  const hx = Math.sin(cam.yaw) * Math.cos(cam.pitch);
+  const hy = Math.sin(cam.pitch);
+  const hz = Math.cos(cam.yaw) * Math.cos(cam.pitch);
+  camera.position.set(tx + hx * cam.dist, ty + hy * cam.dist, tz + hz * cam.dist);
+  camera.lookAt(tx, ty, tz);
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+/* =========================================================
+   HUD
+   ========================================================= */
+function updateHUD() {
+  document.getElementById('hpFill').style.width = (player.hp / player.maxHp * 100) + '%';
+  document.getElementById('expFill').style.width = (player.exp / player.maxExp * 100) + '%';
+  document.getElementById('hpTxt').textContent = 'HP ' + player.hp + ' / ' + player.maxHp;
+  document.getElementById('expTxt').textContent = 'EXP ' + player.exp + ' / ' + player.maxExp;
+  document.getElementById('lvBadge').textContent = player.level;
+  document.getElementById('atkTxt').textContent = '공격력 ' + player.atk;
+  document.getElementById('goldTxt').textContent = '골드 ' + player.gold;
+}
+window.gainExp = function(amount) {
+  player.exp += amount;
+  while (player.exp >= player.maxExp) {
+    player.exp -= player.maxExp; player.level++;
+    player.maxHp += 20; player.hp = player.maxHp; player.atk += 3;
+    player.maxExp = Math.floor(player.maxExp * 1.3);
+  }
+  updateHUD();
+};
+</script>
+</body>
+</html>
