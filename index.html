@@ -39,6 +39,106 @@
   #version { position: fixed; bottom: 10px; right: 14px; color: #8b90a0; font-size: 12px; pointer-events: none; }
   #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #aeb4c2; font-size: 15px; background: #1a1d24; }
 
+  /* ===== 오프닝 화면 ===== */
+  #opening {
+    position: fixed; inset: 0; z-index: 100; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  #opening.hide { opacity: 0; transform: scale(1.06); pointer-events: none; }
+  .op-sky {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, #10152b 0%, #1b2144 40%, #33245a 75%, #4a2f66 100%);
+  }
+  .op-stars {
+    position: absolute; inset: 0; opacity: 0.7;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, #fff, transparent),
+      radial-gradient(1px 1px at 60% 20%, #cfe0ff, transparent),
+      radial-gradient(1px 1px at 80% 40%, #fff, transparent),
+      radial-gradient(1px 1px at 35% 60%, #dfe8ff, transparent),
+      radial-gradient(1px 1px at 75% 70%, #fff, transparent),
+      radial-gradient(1px 1px at 10% 80%, #cfe0ff, transparent),
+      radial-gradient(1px 1px at 50% 85%, #fff, transparent);
+    animation: twinkle 4s ease-in-out infinite alternate;
+  }
+  @keyframes twinkle { from { opacity: 0.35; } to { opacity: 0.85; } }
+  .op-glow {
+    position: absolute; left: 50%; bottom: -30%; width: 120vw; height: 90vh;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse at center, rgba(120,90,200,0.55), rgba(80,60,150,0.15) 45%, transparent 70%);
+    filter: blur(8px);
+    animation: pulseGlow 6s ease-in-out infinite alternate;
+  }
+  @keyframes pulseGlow { from { opacity: 0.6; } to { opacity: 1; } }
+  .op-motes { position: absolute; inset: 0; pointer-events: none; }
+  .mote {
+    position: absolute; bottom: -20px; width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(200,210,255,0.8); box-shadow: 0 0 8px rgba(180,200,255,0.9);
+    animation: rise linear infinite;
+  }
+  @keyframes rise {
+    0% { transform: translateY(0) translateX(0); opacity: 0; }
+    12% { opacity: 0.9; }
+    100% { transform: translateY(-105vh) translateX(30px); opacity: 0; }
+  }
+
+  .op-content { position: relative; z-index: 2; text-align: center; padding: 0 24px; }
+  .op-badges { display: flex; gap: 16px; justify-content: center; margin-bottom: 26px; }
+  .op-badge {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    color: #cdd6f5; font-size: 12px; font-weight: 600;
+    animation: floaty 3.2s ease-in-out infinite;
+  }
+  .op-badge:nth-child(2) { animation-delay: 0.5s; }
+  .op-badge:nth-child(3) { animation-delay: 1s; }
+  .op-badge .ic {
+    width: 52px; height: 52px; border-radius: 14px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
+    display: flex; align-items: center; justify-content: center; font-size: 24px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  }
+  @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+  .op-title {
+    font-size: 64px; font-weight: 800; letter-spacing: 2px; color: #fff;
+    text-shadow: 0 2px 20px rgba(150,120,255,0.6), 0 0 40px rgba(120,90,220,0.4);
+    margin-bottom: 6px; animation: titleIn 1s ease both;
+  }
+  .op-title span { color: #c8a84b; text-shadow: 0 2px 20px rgba(220,180,90,0.7); }
+  @keyframes titleIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .op-sub { color: #aeb6d8; font-size: 14px; margin-bottom: 34px; animation: titleIn 1.2s ease both; }
+
+  .op-form {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    animation: titleIn 1.4s ease both;
+  }
+  .op-label { color: #cdd6f5; font-size: 13px; font-weight: 600; letter-spacing: 1px; }
+  .op-input {
+    width: 280px; max-width: 80vw; padding: 14px 18px; font-size: 17px; text-align: center;
+    border-radius: 12px; border: 2px solid rgba(255,255,255,0.25);
+    background: rgba(10,14,30,0.6); color: #fff; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .op-input::placeholder { color: #7681a8; }
+  .op-input:focus { border-color: #c8a84b; box-shadow: 0 0 0 3px rgba(200,168,75,0.25); }
+  .op-btn {
+    width: 280px; max-width: 80vw; padding: 14px; font-size: 17px; font-weight: 700;
+    border: none; border-radius: 12px; cursor: pointer; color: #1a1224;
+    background: linear-gradient(135deg, #e6cd7e, #c8a84b);
+    box-shadow: 0 6px 20px rgba(200,168,75,0.4); transition: transform 0.12s, box-shadow 0.2s;
+  }
+  .op-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 26px rgba(200,168,75,0.55); }
+  .op-btn:active { transform: translateY(0); }
+  .op-warn { color: #ff8a8a; font-size: 12px; height: 14px; opacity: 0; transition: opacity 0.2s; }
+  .op-warn.show { opacity: 1; }
+  .op-foot { position: absolute; bottom: 16px; z-index: 2; color: #6b74a0; font-size: 12px; }
+
+  @media (max-width: 600px) {
+    .op-title { font-size: 44px; }
+    .op-badge .ic { width: 44px; height: 44px; font-size: 20px; }
+  }
+
   /* ---- 터치 컨트롤 (기본 숨김, 모바일/태블릿에서만 표시) ---- */
   #touchUI { display: none; }
   #touchUI.on { display: block; }
@@ -88,6 +188,34 @@
 </style>
 </head>
 <body>
+  <!-- ===== 오프닝(타이틀) 화면 ===== -->
+  <div id="opening">
+    <div class="op-sky"></div>
+    <div class="op-stars"></div>
+    <div class="op-glow"></div>
+    <div class="op-motes" id="opMotes"></div>
+
+    <div class="op-content">
+      <div class="op-badges">
+        <div class="op-badge"><div class="ic">⚔️</div><span>레벨업</span></div>
+        <div class="op-badge"><div class="ic">🛡️</div><span>장비 강화</span></div>
+        <div class="op-badge"><div class="ic">🧭</div><span>여행</span></div>
+      </div>
+
+      <h1 class="op-title">채운 <span>RPG</span></h1>
+      <p class="op-sub">— 레벨을 올리고, 장비를 벼리고, 미지의 세계로 떠나라 —</p>
+
+      <div class="op-form">
+        <label class="op-label">주인공의 이름</label>
+        <input id="nameInput" class="op-input" type="text" maxlength="12"
+               placeholder="이름을 입력하세요" autocomplete="off" />
+        <button id="startBtn" class="op-btn">여행 시작</button>
+        <div class="op-warn" id="nameWarn">이름을 입력해 주세요</div>
+      </div>
+    </div>
+    <div class="op-foot">PROTO 3D · 채운 RPG</div>
+  </div>
+
   <canvas id="c"></canvas>
 
   <div id="hud">
@@ -97,7 +225,7 @@
       <div class="bar exp"><div class="fill" id="expFill"></div><div class="txt" id="expTxt">EXP</div></div>
     </div>
   </div>
-  <div id="stats"><span id="atkTxt">공격력 10</span><span id="goldTxt">골드 0</span></div>
+  <div id="stats"><span id="nameTxt" style="color:#e6cd7e">주인공</span><span id="atkTxt">공격력 10</span><span id="goldTxt">골드 0</span></div>
   <div id="hint">이동: WASD / 방향키 · 시점: 마우스 드래그 · 줌: 휠 · Shift: 시점 고정 · Space: 점프</div>
   <div id="lockIcon"><div class="ring"></div></div>
   <div id="version">PROTO 3D 0.1</div>
@@ -124,6 +252,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
    전역 상태 — 나중에 몹/스킬/아이템은 여기에 추가
    ========================================================= */
 const player = {
+  name: '주인공',
   hp: 100, maxHp: 100, exp: 0, maxExp: 100,
   level: 1, atk: 10, gold: 0,
   speed: 6, moving: false, animTime: 0,
@@ -135,6 +264,7 @@ const keys = {};
 // 가상 조이스틱 입력 (-1~1). 터치로 갱신됨
 const joy = { x: 0, z: 0, active: false };
 let isTouch = false;
+let gameStarted = false;
 
 // 카메라 궤도 파라미터
 const cam = { yaw: 0, pitch: 0.9, dist: 12, minDist: 6, maxDist: 22, shiftLock: false };
@@ -157,7 +287,62 @@ const MODEL_Y = 0;            // 발이 바닥(y=0)에 오도록 보정
 // 애니메이션 클립 이름 매핑 (모델마다 다름 — 콘솔 로그 보고 맞추세요)
 const ANIM_NAMES = { idle: ['idle','Idle','Armature|idle','대기'], walk: ['walk','Walk','run','Run','걷기'] };
 
+// 게임 준비: 3D 씬은 미리 초기화하고, 실제 시작은 오프닝에서 버튼을 눌러야 진행
 init();
+setupOpening();
+
+/* ===== 오프닝 화면 로직 ===== */
+function setupOpening() {
+  // 떠다니는 입자 생성
+  const motes = document.getElementById('opMotes');
+  for (let i = 0; i < 22; i++) {
+    const m = document.createElement('div');
+    m.className = 'mote';
+    m.style.left = Math.random() * 100 + '%';
+    m.style.animationDuration = (6 + Math.random() * 8) + 's';
+    m.style.animationDelay = (Math.random() * 8) + 's';
+    const s = 3 + Math.random() * 5;
+    m.style.width = s + 'px'; m.style.height = s + 'px';
+    motes.appendChild(m);
+  }
+
+  const input = document.getElementById('nameInput');
+  const btn = document.getElementById('startBtn');
+  const warn = document.getElementById('nameWarn');
+
+  const start = () => {
+    const name = input.value.trim();
+    if (!name) {
+      warn.classList.add('show');
+      input.focus();
+      return;
+    }
+    warn.classList.remove('show');
+    startGame(name);
+  };
+
+  btn.addEventListener('click', start);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') start(); });
+  input.addEventListener('input', () => warn.classList.remove('show'));
+  setTimeout(() => input.focus(), 400);
+}
+
+/* ===== 이름 확정 → 게임 시작 ===== */
+function startGame(name) {
+  player.name = name;
+  gameStarted = true;
+  // 이름표 갱신
+  if (heroParts.label && heroParts.label.parent) {
+    heroParts.label.parent.remove(heroParts.label);
+    attachLabel(hero);
+  }
+  updateHUD();
+
+  // 오프닝 페이드아웃 후 제거
+  const op = document.getElementById('opening');
+  op.classList.add('hide');
+  setTimeout(() => { op.style.display = 'none'; }, 700);
+}
 
 function init() {
   const canvas = document.getElementById('c');
@@ -339,7 +524,7 @@ function buildPlaceholder() {
 
 /* 이름표를 컨테이너에 부착 */
 function attachLabel(container) {
-  const label = makeLabel('Lv.' + player.level + ' 주인공');
+  const label = makeLabel('Lv.' + player.level + ' ' + player.name);
   label.position.set(0, 5.4, 0);
   container.add(label);
   heroParts.label = label;
@@ -484,6 +669,8 @@ function loop() {
 }
 
 function updatePlayer(dt) {
+  // 오프닝 중에는 조작 무시
+  if (!gameStarted) return;
   // 카메라 기준 이동 방향 계산 (키보드 + 조이스틱)
   let ix = 0, iz = 0;
   if (keys['w'] || keys['arrowup']) iz -= 1;
@@ -570,6 +757,7 @@ function onResize() {
    HUD
    ========================================================= */
 function updateHUD() {
+  document.getElementById('nameTxt').textContent = player.name;
   document.getElementById('hpFill').style.width = (player.hp / player.maxHp * 100) + '%';
   document.getElementById('expFill').style.width = (player.exp / player.maxExp * 100) + '%';
   document.getElementById('hpTxt').textContent = 'HP ' + player.hp + ' / ' + player.maxHp;
