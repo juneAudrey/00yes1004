@@ -34,12 +34,14 @@
     flex: 1 1 auto;
     min-height: 0;                    /* flex 자식 오버플로 방지 */
     overflow: hidden;
+    /* canvas가 못 덮는 부분 대비: 배경 이미지를 stage에도 깔아 검은 여백 방지 */
+    background: #3a2a2a url('assets/bg/battlefield.png') center center / cover no-repeat;
   }
   /* 캔버스: stage를 꽉 채우고, 내부는 JS가 비율 맞춰 letterbox */
   #canvas {
     display: block;
     width: 100%; height: 100%;
-    background: #ffffff;
+    background: transparent;          /* 아래 stage 배경이 비치도록 */
     touch-action: none;
   }
   /* 하단 컨트롤 바 (버튼) — 캔버스와 '겹치지 않게' 별도 행 */
@@ -112,10 +114,31 @@
     padding: 6px 12px; border-radius: 20px; text-align:right;
     max-width: 55%;
   }
+  /* HUD 우측에 음소거 버튼 자리 확보 (겹침 방지) */
+  #hud { padding-right: clamp(52px, 8vw, 64px); }
   /* 아주 좁은 화면(세로 모바일)에서는 스테이지명 숨겨 겹침 방지 */
   @media (max-width: 480px){
     #stage-name { display: none; }
   }
+  /* ===== 음소거 버튼 (항상 최상단, 우측 상단 고정) ===== */
+  #mute-btn {
+    position: fixed; z-index: 50;
+    top: clamp(6px,1.5vw,10px);
+    right: clamp(8px,2vw,14px);
+    width: clamp(38px,7vw,46px); height: clamp(38px,7vw,46px);
+    border: 2px solid rgba(255,255,255,.25);
+    border-radius: 50%;
+    background: rgba(20,20,26,.9);
+    color: #fff; font-size: clamp(16px,3.4vw,22px);
+    cursor: pointer; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 10px rgba(0,0,0,.4);
+    transition: transform .1s, border-color .15s, background .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #mute-btn:hover { border-color: rgba(255,255,255,.6); background: rgba(30,30,40,.95); }
+  #mute-btn:active { transform: scale(.9); }
+  #mute-btn.muted { color:#ff6b6b; border-color: rgba(255,107,107,.5); }
   /* ===== 오프닝 화면 (대결 구도) ===== */
   #opening {
     position: fixed; inset: 0; z-index: 30;
@@ -328,6 +351,9 @@
 
   <!-- 하단 버튼바 (별도 행) -->
   <div id="ui"><!-- 병사 버튼 JS로 생성 --></div>
+
+  <!-- 음소거 버튼: 항상 최상단, 어디에도 안 겹침 -->
+  <button id="mute-btn" onclick="bgmToggleMute()" aria-label="음소거 전환">🔊</button>
 </div>
 
 <script>
@@ -364,6 +390,114 @@ function playSfx(key){
     a.currentTime = 0; a.play().catch(()=>{});
   } catch(e){}
 }
+
+/* =========================================================================
+   배경음악 (Web Audio API로 실시간 합성 — 외부 파일 불필요)
+   대결 분위기의 루프: 드럼 + 베이스 + 코드 + 멜로디
+   ========================================================================= */
+const BGM = {
+  ctx: null, master: null, gain: null,
+  playing: false, muted: false,
+  timer: null, step: 0, nextTime: 0,
+};
+
+function bgmInit(){
+  if (BGM.ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  BGM.ctx = new AC();
+  BGM.master = BGM.ctx.createGain();
+  BGM.master.gain.value = BGM.muted ? 0 : 0.5;
+  BGM.master.connect(BGM.ctx.destination);
+}
+
+// 음이름 → 주파수
+function noteFreq(n){ return 440 * Math.pow(2, (n-69)/12); }
+
+// 한 음 재생 (type, midi, 시작시각, 길이, 볼륨)
+function bgmTone(type, midi, t, dur, vol){
+  const ac = BGM.ctx;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = type;
+  o.frequency.value = noteFreq(midi);
+  o.connect(g); g.connect(BGM.master);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.start(t); o.stop(t+dur+0.02);
+}
+// 드럼 (노이즈/사인 기반)
+function bgmKick(t){
+  const ac=BGM.ctx, o=ac.createOscillator(), g=ac.createGain();
+  o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(50,t+0.12);
+  g.gain.setValueAtTime(0.9,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.14);
+  o.connect(g); g.connect(BGM.master); o.start(t); o.stop(t+0.16);
+}
+function bgmHat(t){
+  const ac=BGM.ctx;
+  const b=ac.createBuffer(1, ac.sampleRate*0.05, ac.sampleRate);
+  const d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,3);
+  const s=ac.createBufferSource(); s.buffer=b;
+  const g=ac.createGain(); g.gain.value=0.18;
+  const hp=ac.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=7000;
+  s.connect(hp); hp.connect(g); g.connect(BGM.master); s.start(t);
+}
+
+// 시퀀스 정의 (16스텝 × 마디). 코드 진행: Am - F - C - G (경쾌+비장)
+const BGM_BASS = [45,45,45,45, 41,41,41,41, 36,36,36,36, 43,43,43,43]; // 루트음
+const BGM_CHORD = [ // 각 마디 코드 구성음
+  [57,60,64],[57,60,64],[57,60,64],[57,60,64],
+  [53,57,60],[53,57,60],[53,57,60],[53,57,60],
+  [48,52,55],[48,52,55],[48,52,55],[48,52,55],
+  [55,59,62],[55,59,62],[55,59,62],[55,59,62],
+];
+// 멜로디 (약간 영웅적인 라인, 0=쉼표)
+const BGM_MELODY = [69,0,72,74, 76,0,74,72, 72,0,76,79, 76,74,72,0,
+                    69,0,72,74, 76,79,81,79, 76,0,72,74, 76,0,0,0];
+
+function bgmSchedule(){
+  const ac = BGM.ctx;
+  const stepDur = 0.16;  // 16분음표 길이 → 템포 약 94BPM
+  while (BGM.nextTime < ac.currentTime + 0.2){
+    const s = BGM.step % 16;
+    const sFull = BGM.step % 32;
+    const t = BGM.nextTime;
+    // 베이스 (매 스텝 루트, 4스텝마다 강)
+    if (s%2===0) bgmTone('triangle', BGM_BASS[s]-12, t, 0.30, 0.32);
+    // 코드 (마디 시작마다 은은히)
+    if (s%4===0){ for(const n of BGM_CHORD[s]) bgmTone('sawtooth', n, t, 0.55, 0.055); }
+    // 멜로디
+    const mel = BGM_MELODY[sFull];
+    if (mel>0) bgmTone('square', mel, t, 0.28, 0.14);
+    // 드럼
+    if (s%4===0) bgmKick(t);
+    if (s%4===2) bgmKick(t);
+    if (s%2===1) bgmHat(t);
+
+    BGM.nextTime += stepDur;
+    BGM.step++;
+  }
+}
+
+function bgmStart(){
+  bgmInit();
+  if (!BGM.ctx || BGM.playing) return;
+  if (BGM.ctx.state === 'suspended') BGM.ctx.resume();
+  BGM.playing = true;
+  BGM.step = 0;
+  BGM.nextTime = BGM.ctx.currentTime + 0.1;
+  BGM.timer = setInterval(bgmSchedule, 40);
+}
+function bgmSetMuted(m){
+  BGM.muted = m;
+  if (BGM.master) BGM.master.gain.value = m ? 0 : 0.5;
+  try { localStorage.setItem('bgm_muted', m?'1':'0'); } catch(e){}
+  const btn = document.getElementById('mute-btn');
+  if (btn){ btn.textContent = m ? '🔇' : '🔊'; btn.classList.toggle('muted', m); }
+}
+function bgmToggleMute(){ bgmSetMuted(!BGM.muted); }
 
 // ── 내부 게임 해상도(좌표계). 실제 화면은 여기에 맞춰 스케일된다. ──
 const GAME_W = 1280;
@@ -420,12 +554,12 @@ const UNIT_TYPES = {
   },
 
   // ── 레제: 원거리. 폭탄을 던져 착탄 지점에 범위 피해 ──
-  // 이동=걷기, 공격=던지기. 속도 0.7배(느림), 공격력·체력 포치타와 동일
+  // 이동=걷기, 공격=던지기. 속도·공격력 포치타 ×0.5, 체력 포치타와 동일
   reze: {
     name: '레제', icon: '🎀', color: '#34495e',
     hp: 140,            // 포치타 ×1.0
-    dmg: 20,            // 포치타 ×1.0
-    atkSpeed: 1.1, range: 240, speed: 56,   // speed = 80 ×0.7
+    dmg: 10,            // 포치타 ×0.5
+    atkSpeed: 1.1, range: 240, speed: 40,   // speed = 80 ×0.5
     cost: 70, cooldown: 3.6, radius: 28,
     projectile: 'bomb',              // 폭탄 발사체
     splashRadius: 112,               // 캐릭터 크기(radius*2≈56)의 약 2배 = 112
@@ -443,8 +577,8 @@ const UNIT_TYPES = {
   yugisa: {
     name: '유기사', icon: '🪽', color: '#7f8c8d',
     hp: 182,            // 포치타 ×1.3
-    dmg: 14,            // 포치타 ×0.7
-    atkSpeed: 0.6, range: 64, speed: 104,   // speed = 80 ×1.3
+    dmg: 10,            // 포치타 ×0.5
+    atkSpeed: 0.6, range: 64, speed: 120,   // speed = 80 ×1.5
     cost: 60, cooldown: 2.6, radius: 32,
     gifWalk: 'assets/characters/yugisa/yugisa_run.gif',
     gifAtk:  'assets/characters/yugisa/yugisa_attack.gif',
@@ -673,33 +807,46 @@ function dealDamage(ref, dmg){
    렌더링
    ========================================================================= */
 function draw() {
-  // 전체 캔버스를 여백 색으로 클리어 (letterbox 바깥 영역)
   ctx.setTransform(1,0,0,1,0,0);
-  ctx.fillStyle = '#14141a';
-  ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.clearRect(0,0,cv.width,cv.height);   // 투명 클리어 → CSS stage 배경이 빈틈 받침
+
+  const groundY = GROUND_Y+40;
+  const bgImg = getImg('assets/bg/battlefield.png');
+
+  // ── 배경을 화면 전체(letterbox 여백 포함)에 그려 검은 부분 제거 ──
+  if (bgImg && bgImg.complete && bgImg.naturalWidth) {
+    const cw = cv.width, ch = cv.height;
+    // 빈틈 방지용 베이스: 배경 이미지의 하늘/지면 평균색 계열로 먼저 채움
+    ctx.fillStyle = '#3a2a2a';
+    ctx.fillRect(0,0,cw,ch);
+    // cover + 오버스캔(1.04배)으로 가장자리 확실히 덮기
+    const over = 1.04;
+    const ir = bgImg.naturalWidth / bgImg.naturalHeight;
+    const cr = cw / ch;
+    let dw, dh;
+    if (cr > ir){ dw = cw*over; dh = dw/ir; }
+    else        { dh = ch*over; dw = dh*ir; }
+    // 세로는 하단이 확실히 덮이도록 아래쪽 정렬에 가깝게(지면이 아래 있음)
+    const dx = (cw - dw)/2;
+    const dy = (ch - dh)/2;
+    ctx.drawImage(bgImg, dx, dy, dw, dh);
+  } else {
+    // 폴백: 여백까지 채우는 그라데이션
+    const bg = ctx.createLinearGradient(0,0,cv.width,0);
+    bg.addColorStop(0,'#5a2b2b'); bg.addColorStop(0.5,'#4a3a5a'); bg.addColorStop(1,'#2b4a3a');
+    ctx.fillStyle = bg; ctx.fillRect(0,0,cv.width,cv.height);
+  }
 
   // 게임 좌표계로 변환 (DPR 포함): 화면px = (게임좌표 × scale + off) × dpr
   ctx.setTransform(scale*dpr, 0, 0, scale*dpr, offX*dpr, offY*dpr);
 
-  // 배경 이미지 (왼쪽 붉은 황무지=유튜버 / 오른쪽 푸른 초원=애니)
-  const groundY = GROUND_Y+40;
-  const bgImg = getImg('assets/bg/battlefield.png');
+  // 가독성 보강: 게임 영역 하단(지면)에 아주 옅은 밝기 오버레이
   if (bgImg && bgImg.complete && bgImg.naturalWidth) {
-    ctx.drawImage(bgImg, 0, 0, GAME_W, GAME_H);
-    // 캐릭터/타워 가독성 보강: 하단(지면)에 아주 옅은 밝기 오버레이
     const veil = ctx.createLinearGradient(0, groundY-60, 0, GAME_H);
     veil.addColorStop(0, 'rgba(255,255,255,0)');
-    veil.addColorStop(1, 'rgba(255,255,255,0.12)');
+    veil.addColorStop(1, 'rgba(255,255,255,0.10)');
     ctx.fillStyle = veil;
     ctx.fillRect(0, groundY-60, GAME_W, GAME_H-(groundY-60));
-  } else {
-    // ── 폴백: 로드 전 진영 그라데이션 ──
-    const bg = ctx.createLinearGradient(0,0,GAME_W,0);
-    bg.addColorStop(0.00,'#fdeaea'); bg.addColorStop(0.50,'#f7f4fb'); bg.addColorStop(1.00,'#efe6fb');
-    ctx.fillStyle = bg; ctx.fillRect(0,0,GAME_W,GAME_H);
-    const gg = ctx.createLinearGradient(0,0,GAME_W,0);
-    gg.addColorStop(0,'#f3d9d9'); gg.addColorStop(0.5,'#ede8f0'); gg.addColorStop(1,'#e2d3f2');
-    ctx.fillStyle = gg; ctx.fillRect(0, groundY, GAME_W, GAME_H-groundY);
   }
 
   // 타워 그리기
@@ -1000,6 +1147,7 @@ let started = false;
 function startGame(){
   if (started) return;
   started = true;
+  bgmStart();                       // 배경음악 시작 (첫 상호작용 시점)
   const op = document.getElementById('opening');
   op.style.transition = 'opacity .35s';
   op.style.opacity = '0';
@@ -1008,10 +1156,11 @@ function startGame(){
   state.last = performance.now();
   // playSfx('start');  // 사운드 넣으면 사용
 }
-// 아무 키 / 클릭 / 터치로 시작
+// 아무 키 / 클릭 / 터치로 시작 (단, 음소거 버튼 클릭은 제외)
+function isMuteBtn(e){ return e.target && e.target.id === 'mute-btn'; }
 window.addEventListener('keydown', startGame);
-window.addEventListener('mousedown', (e)=>{ if(!started) startGame(); });
-window.addEventListener('touchstart', (e)=>{ if(!started){ startGame(); } }, {passive:true});
+window.addEventListener('mousedown', (e)=>{ if(!started && !isMuteBtn(e)) startGame(); });
+window.addEventListener('touchstart', (e)=>{ if(!started && !isMuteBtn(e)) startGame(); }, {passive:true});
 
 // ── 시작 ──
 resize();
@@ -1023,6 +1172,12 @@ requestAnimationFrame(loop);
 // 폰트/레이아웃 확정 후 한 번 더 크기 보정 (초기 0px 방지)
 window.addEventListener('load', ()=>setTimeout(resize, 50));
 setTimeout(resize, 0);
+
+// 저장된 음소거 설정 복원 (없으면 소리 켜짐)
+try {
+  const m = localStorage.getItem('bgm_muted');
+  if (m === '1') bgmSetMuted(true);
+} catch(e){}
 </script>
 </body>
 </html>
