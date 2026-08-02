@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
 <title>월드 타워 워 (World Tower War)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -499,6 +500,23 @@ function bgmSetMuted(m){
 }
 function bgmToggleMute(){ bgmSetMuted(!BGM.muted); }
 
+// 모바일/태블릿 전체화면
+async function enterFullscreen() {
+
+  // PC는 실행 안 함
+  if (window.innerWidth >= 1024) return;
+
+  const el = document.documentElement;
+
+  try {
+    if (el.requestFullscreen) {
+      await el.requestFullscreen({ navigationUI: "hide" });
+    } else if (el.webkitRequestFullscreen) {
+      await el.webkitRequestFullscreen();
+    }
+  } catch(e){}
+}
+
 // ── 내부 게임 해상도(좌표계). 실제 화면은 여기에 맞춰 스케일된다. ──
 const GAME_W = 1280;
 const GAME_H = 720;
@@ -522,7 +540,14 @@ function resize() {
 }
 // 리사이즈/회전/주소창 변화 모두 대응
 window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', ()=>setTimeout(resize,120));
+window.addEventListener('orientationchange', ()=>{
+    setTimeout(()=>{
+        resize();
+        if(!document.fullscreenElement){
+            enterFullscreen();
+        }
+    },300);
+});
 
 /* =========================================================================
    유닛(병종) 정의 — 여기 값만 바꾸면 밸런스 조정됨
@@ -1145,9 +1170,10 @@ function restart(){
 // ── 오프닝 → 게임 시작 ──
 let started = false;
 function startGame(){
-  if (started) return;
+if (started) return;
+  await enterFullscreen();
   started = true;
-  bgmStart();                       // 배경음악 시작 (첫 상호작용 시점)
+  bgmStart();                  // 배경음악 시작 (첫 상호작용 시점)
   const op = document.getElementById('opening');
   op.style.transition = 'opacity .35s';
   op.style.opacity = '0';
