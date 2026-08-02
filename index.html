@@ -2,8 +2,14 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>월드 타워 워 (World Tower War)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>채운이의 대전쟁</title>
+<!-- PWA: 홈 화면에 추가하면 전체화면 앱으로 실행 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14141a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
@@ -114,17 +120,16 @@
     padding: 6px 12px; border-radius: 20px; text-align:right;
     max-width: 55%;
   }
-  /* HUD 우측에 음소거 버튼 자리 확보 (겹침 방지) */
-  #hud { padding-right: clamp(52px, 8vw, 64px); }
+  /* HUD 우측에 음소거+전체화면 버튼 자리 확보 (겹침 방지) */
+  #hud { padding-right: clamp(100px, 15vw, 120px); }
   /* 아주 좁은 화면(세로 모바일)에서는 스테이지명 숨겨 겹침 방지 */
   @media (max-width: 480px){
     #stage-name { display: none; }
   }
-  /* ===== 음소거 버튼 (항상 최상단, 우측 상단 고정) ===== */
-  #mute-btn {
+  /* ===== 음소거 / 전체화면 버튼 (항상 최상단, 우측 상단 고정) ===== */
+  #mute-btn, #fs-btn {
     position: fixed; z-index: 50;
     top: clamp(6px,1.5vw,10px);
-    right: clamp(8px,2vw,14px);
     width: clamp(38px,7vw,46px); height: clamp(38px,7vw,46px);
     border: 2px solid rgba(255,255,255,.25);
     border-radius: 50%;
@@ -136,9 +141,13 @@
     transition: transform .1s, border-color .15s, background .15s;
     -webkit-tap-highlight-color: transparent;
   }
-  #mute-btn:hover { border-color: rgba(255,255,255,.6); background: rgba(30,30,40,.95); }
-  #mute-btn:active { transform: scale(.9); }
+  #mute-btn { right: clamp(8px,2vw,14px); }
+  /* 전체화면 버튼은 음소거 버튼 왼쪽에 */
+  #fs-btn   { right: calc(clamp(8px,2vw,14px) + clamp(38px,7vw,46px) + 8px); }
+  #mute-btn:hover, #fs-btn:hover { border-color: rgba(255,255,255,.6); background: rgba(30,30,40,.95); }
+  #mute-btn:active, #fs-btn:active { transform: scale(.9); }
   #mute-btn.muted { color:#ff6b6b; border-color: rgba(255,107,107,.5); }
+  #fs-btn.on { color:#7bed9f; border-color: rgba(123,237,159,.5); }
   /* ===== 오프닝 화면 (대결 구도) ===== */
   #opening {
     position: fixed; inset: 0; z-index: 30;
@@ -354,6 +363,8 @@
 
   <!-- 음소거 버튼: 항상 최상단, 어디에도 안 겹침 -->
   <button id="mute-btn" onclick="bgmToggleMute()" aria-label="음소거 전환">🔊</button>
+  <!-- 전체화면 버튼 -->
+  <button id="fs-btn" onclick="toggleFullscreen()" aria-label="전체화면 전환">⛶</button>
 </div>
 
 <script>
@@ -498,6 +509,32 @@ function bgmSetMuted(m){
   if (btn){ btn.textContent = m ? '🔇' : '🔊'; btn.classList.toggle('muted', m); }
 }
 function bgmToggleMute(){ bgmSetMuted(!BGM.muted); }
+
+/* ── 전체화면 토글 (갤럭시 탭 등 크롬 호환) ── */
+function toggleFullscreen(){
+  const el = document.documentElement;
+  const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+  try {
+    if (!isFs){
+      const req = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen;
+      if (req) req.call(el);
+      // 가로 방향 잠금 시도 (지원 기기에서만)
+      if (screen.orientation && screen.orientation.lock)
+        screen.orientation.lock('landscape').catch(()=>{});
+    } else {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (exit) exit.call(document);
+    }
+  } catch(e){}
+}
+// 전체화면 상태에 따라 버튼 아이콘 갱신
+function _syncFsBtn(){
+  const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const btn = document.getElementById('fs-btn');
+  if (btn){ btn.textContent = isFs ? '🗗' : '⛶'; btn.classList.toggle('on', isFs); setTimeout(resize,120); }
+}
+document.addEventListener('fullscreenchange', _syncFsBtn);
+document.addEventListener('webkitfullscreenchange', _syncFsBtn);
 
 // ── 내부 게임 해상도(좌표계). 실제 화면은 여기에 맞춰 스케일된다. ──
 const GAME_W = 1280;

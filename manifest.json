@@ -1,0 +1,18 @@
+{
+  "name": "채운이의 대전쟁",
+  "short_name": "채운이의 대전쟁",
+  "description": "유튜버 vs 애니메이션 타워 대전쟁 게임",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#14141a",
+  "theme_color": "#14141a",
+  "icons": [
+    {
+      "src": "assets/opening/anime.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
